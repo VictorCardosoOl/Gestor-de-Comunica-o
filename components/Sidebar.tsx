@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { CATEGORIES } from '../constants';
 import { 
   GalleryVerticalEnd,
   Layers,
@@ -12,7 +13,6 @@ import {
 } from 'lucide-react';
 import { Category } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useStore } from '../store/useStore';
 
 interface SidebarProps {
   selectedCategory: string;
@@ -34,13 +34,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onCloseMobile
 }) => {
-  const { categories } = useStore();
   const [isPinned, setIsPinned] = useState(true);
   const [isHovered, setIsHovered] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   // Expanded logic: Pinned OR Hovered (Desktop), or Open (Mobile)
   const isExpanded = (isPinned || isHovered) && !isOpen ? true : isOpen ? true : false;
+  // Width logic
+  const widthClass = isOpen ? 'w-[18rem]' : (isExpanded ? 'w-[18rem]' : 'w-[5.5rem]');
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: any) => {
@@ -164,7 +165,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <div className={`my-3 mx-4 h-px bg-gradient-to-r from-transparent via-black/5 to-transparent transition-opacity duration-300 ${!isExpanded ? 'opacity-0' : 'opacity-100'}`} />
 
-            {categories.map((cat: Category) => {
+            {CATEGORIES.map((cat: Category) => {
               const Icon = IconMap[cat.icon] || GalleryVerticalEnd;
               const isSelected = selectedCategory === cat.id;
 
