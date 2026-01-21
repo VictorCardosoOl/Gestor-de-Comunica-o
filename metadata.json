@@ -1,5 +1,5 @@
 {
   "name": "QuickComms - Gestor de Comunicação",
-  "description": "Uma ferramenta para gerenciar, editar e copiar modelos de e-mails e mensagens para WhatsApp e Outlook, com suporte a categorização e assistência de IA.",
+  "description": "Uma ferramenta para gerenciar, editar e copiar modelos de e-mails e mensagens para WhatsApp e Outlook, com suporte a categorização e personalização.",
   "requestFramePermissions": []
 }

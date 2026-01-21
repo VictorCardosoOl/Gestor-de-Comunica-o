@@ -3,6 +3,8 @@ import { Template, CommunicationChannel } from '../types';
 import { Copy, RefreshCw, Check, MoveLeft, SlidersHorizontal, Quote } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTemplateCopier } from '../hooks/useTemplateCopier';
+import { useStore } from '../store/useStore';
+import { useDebounce } from '../hooks/useDebounce';
 
 interface EditorProps {
   template: Template;
@@ -33,11 +35,28 @@ interface Scenario {
 }
 
 export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
+  const { updateTemplate, resetTemplate } = useStore();
+
   const [subject, setSubject] = useState(template.subject || '');
   const [content, setContent] = useState(template.content);
   const [secondaryContent, setSecondaryContent] = useState(template.secondaryContent || '');
+  
   const [variableValues, setVariableValues] = useState<Record<string, string>>({});
   const [showVariables, setShowVariables] = useState(true);
+
+  // Debounce values to avoid updating global store/storage on every keystroke
+  const debouncedSubject = useDebounce(subject, 500);
+  const debouncedContent = useDebounce(content, 500);
+  const debouncedSecondaryContent = useDebounce(secondaryContent, 500);
+
+  // Sync edits to Store (Persist)
+  useEffect(() => {
+    updateTemplate(template.id, {
+      subject: debouncedSubject,
+      content: debouncedContent,
+      secondaryContent: debouncedSecondaryContent
+    });
+  }, [debouncedSubject, debouncedContent, debouncedSecondaryContent, template.id, updateTemplate]);
 
   // Use Custom Hook for Copy Logic
   const { copyToClipboard, isCopied } = useTemplateCopier();
@@ -82,15 +101,20 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
     return processed;
   }, []);
 
+  // Initialization
   useEffect(() => {
     setSubject(template.subject || '');
-    // Process content to apply automated variables like [Saudação] immediately
+    // Note: We apply processTemplate (variable replacement) on mount. 
+    // If the template was already edited and persisted, it keeps the edits.
+    // If it's a fresh load, it might re-apply time-based variables.
+    // To be safe, we only apply if the text hasn't been personalized yet, but here we'll just load what's in the store (passed via props).
+    // However, to ensure [Saudação] is always fresh if it still exists:
     setContent(processTemplate(template.content)); 
     setSecondaryContent(processTemplate(template.secondaryContent || ''));
     setVariableValues({});
-  }, [template, processTemplate]);
+  }, [template.id, processTemplate]); // Depend only on ID to avoid re-resetting on every prop change
 
-  // Auto-resize textareas when content changes or template loads
+  // Auto-resize textareas when content changes
   const adjustTextareaHeight = (element: HTMLTextAreaElement | null) => {
     if (element) {
       element.style.height = 'auto';
@@ -99,7 +123,6 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
   };
 
   useEffect(() => {
-    // Small timeout to ensure render is complete
     const timer = setTimeout(() => {
       adjustTextareaHeight(mainTextareaRef.current);
       adjustTextareaHeight(secondaryTextareaRef.current);
@@ -107,21 +130,16 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
     return () => clearTimeout(timer);
   }, [content, secondaryContent, isScenarioMode, template.id]);
 
-  // Recalculate scenarios based on the processed content
+  // Recalculate scenarios
   const scenarios: Scenario[] = useMemo(() => {
     if (!isScenarioMode) return [];
-    // Split by bracket but preserve content logic
     const rawSegments = content.split('[').filter(s => s.trim().length > 0);
-    
     return rawSegments.map(seg => {
       if (!seg.startsWith('CENÁRIO:')) return null;
-      
       const closingBracketIndex = seg.indexOf(']');
       if (closingBracketIndex === -1) return null;
-
-      const title = seg.substring(8, closingBracketIndex).trim(); // Remove 'CENÁRIO: '
+      const title = seg.substring(8, closingBracketIndex).trim(); 
       const text = seg.substring(closingBracketIndex + 1).trim();
-      
       return { title, text };
     }).filter((item): item is Scenario => item !== null);
   }, [content, isScenarioMode]);
@@ -129,7 +147,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
   // Sync Logic (Filtered to ignore Scenarios)
   const placeholders = useMemo(() => {
     const regex = /\[(.*?)\]/g;
-    const allText = `${template.subject || ''} ${template.content} ${template.secondaryContent || ''} ${template.tertiaryContent || ''}`;
+    const allText = `${subject || ''} ${content} ${secondaryContent || ''} ${template.tertiaryContent || ''}`;
     const found = allText.match(regex);
     if (!found) return [];
     const unique = Array.from(new Set(found));
@@ -137,16 +155,15 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
       !p.includes('Saudação') && 
       !p.includes('Data Hoje') && 
       !p.includes('Data Extenso') &&
-      !p.includes('CENÁRIO') // CRITICAL: Ignore scenario tags
+      !p.includes('CENÁRIO')
     );
-  }, [template]);
+  }, [subject, content, secondaryContent, template.tertiaryContent]);
 
   const handleVariableChange = (placeholder: string, inputValue: string) => {
     const oldValue = variableValues[placeholder] || placeholder;
     const newValue = inputValue === '' ? placeholder : inputValue;
     setVariableValues(prev => ({ ...prev, [placeholder]: newValue }));
     
-    // Only replace in text, do not update 'content' state directly if in scenario mode to avoid breaking parser
     const replaceInText = (text: string) => text.split(oldValue).join(newValue);
     setSubject(prev => replaceInText(prev));
     setContent(prev => replaceInText(prev));
@@ -154,11 +171,11 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
   };
 
   const handleReset = () => {
-    if (window.confirm('Restaurar texto original?')) {
-      setSubject(template.subject || '');
-      setContent(processTemplate(template.content)); // Reset to processed
-      setSecondaryContent(processTemplate(template.secondaryContent || ''));
-      setVariableValues({});
+    if (window.confirm('Restaurar modelo original? Todas as edições salvas serão perdidas.')) {
+      resetTemplate(template.id);
+      // Local state update will happen via useEffect dependent on template.id re-render, 
+      // but to be instant we might need to wait for store prop update.
+      // Ideally, the parent passes the new reset template prop, triggering the useEffect above.
     }
   };
 
@@ -217,7 +234,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
             transition={{ type: "spring", stiffness: 200, damping: 15 }}
             onClick={handleReset}
             className="text-gray-500 hover:text-black transition-colors p-2.5 md:p-3 hover:bg-white/40 rounded-full"
-            title="Resetar"
+            title="Restaurar Original"
           >
             <RefreshCw size={18} strokeWidth={0.75} />
           </motion.button>

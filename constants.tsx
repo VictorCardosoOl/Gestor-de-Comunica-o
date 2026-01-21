@@ -335,5 +335,10 @@ Agradeço a compreensão e permaneço à disposição para receber novas contrib
  
 Agradecemos sinceramente por sua participação no processo seletivo para *Estagio* na vaga de *Atendente de Suporte Técnico* na Wise System.
 
- 
-Após uma análise criteriosa,
+Após uma análise criteriosa, optamos por seguir com outro perfil que se adequa mais especificamente às demandas da vaga neste momento.
+
+Seu currículo permanecerá em nosso banco de talentos para futuras oportunidades.
+
+Desejamos sucesso em sua jornada!`
+  }
+];

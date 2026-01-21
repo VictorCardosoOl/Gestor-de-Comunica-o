@@ -1,27 +1,40 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Editor } from './components/Editor';
-import { INITIAL_TEMPLATES, CATEGORIES } from './constants';
-import { Template } from './types';
 import { Menu, Search, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDebounce } from './hooks/useDebounce';
+import { useStore } from './store/useStore';
 
 const App: React.FC = () => {
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  // Zustand Store
+  const { 
+    templates, 
+    categories, 
+    selectedCategoryId, 
+    selectedTemplateId, 
+    searchQuery,
+    setCategory,
+    selectTemplate,
+    setSearchQuery
+  } = useStore();
+
+  const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+  const [isSearchFocused, setIsSearchFocused] = React.useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   
-  // Performance: Debounce search query by 300ms
+  // Performance: Debounce search query logic for filtering
+  // Note: We update the store immediately for UI binding, but filtered list calculation uses debounced value
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  // Derived State: Selected Template Object
+  const selectedTemplate = useMemo(() => 
+    templates.find(t => t.id === selectedTemplateId) || null
+  , [templates, selectedTemplateId]);
 
-  // Search Logic updated to use debounced query
+  // Search Logic
   const filteredTemplates = useMemo(() => {
-    let filtered = INITIAL_TEMPLATES || [];
+    let filtered = templates || [];
     
     // Normalize string to ignore accents and case
     const normalize = (str: string) => 
@@ -44,30 +57,33 @@ const App: React.FC = () => {
                 secondary.includes(query);
        });
     } else {
-      if (selectedCategory !== 'all') {
-        filtered = filtered.filter(t => t.category === selectedCategory);
+      if (selectedCategoryId !== 'all') {
+        filtered = filtered.filter(t => t.category === selectedCategoryId);
       }
     }
 
     return filtered;
-  }, [selectedCategory, debouncedSearchQuery]);
+  }, [selectedCategoryId, debouncedSearchQuery, templates]);
 
   const currentCategoryName = debouncedSearchQuery 
     ? `Resultados`
-    : (selectedCategory === 'all' 
+    : (selectedCategoryId === 'all' 
       ? 'Visão Geral' 
-      : CATEGORIES.find(c => c.id === selectedCategory)?.name || 'Módulo');
+      : categories.find(c => c.id === selectedCategoryId)?.name || 'Módulo');
+
+  const handleCloseEditor = () => {
+    selectTemplate(null);
+  };
 
   return (
     // Main Container
     <div className="flex h-screen w-full overflow-hidden text-[#111] font-sans bg-[#f2f2f4]">
       
       <Sidebar 
-        selectedCategory={debouncedSearchQuery ? 'all' : selectedCategory} 
+        selectedCategory={debouncedSearchQuery ? 'all' : selectedCategoryId} 
         onSelectCategory={(id) => {
-          setSelectedCategory(id);
-          setSearchQuery(''); 
-          setSelectedTemplate(null);
+          setCategory(id);
+          setIsSidebarOpen(false); // Auto close mobile sidebar
         }}
         isOpen={isSidebarOpen}
         onCloseMobile={() => setIsSidebarOpen(false)}
@@ -184,10 +200,10 @@ const App: React.FC = () => {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.03 }}
-                      onClick={() => setSelectedTemplate(template)}
+                      onClick={() => selectTemplate(template.id)}
                       className={`
                         w-full text-left p-4 rounded-xl transition-all duration-200 group relative
-                        ${selectedTemplate?.id === template.id 
+                        ${selectedTemplateId === template.id 
                           ? 'bg-white shadow-[0_4px_12px_-2px_rgba(0,0,0,0.06)] border border-white/60 ring-1 ring-black/5' 
                           : 'hover:bg-white/40 border border-transparent hover:border-white/30'}
                       `}
@@ -195,27 +211,27 @@ const App: React.FC = () => {
                       <div className="flex justify-between items-start mb-2">
                         <span className={`
                           text-[9px] font-bold uppercase tracking-[0.1em] font-sans px-2 py-0.5 rounded-md border
-                          ${selectedTemplate?.id === template.id 
+                          ${selectedTemplateId === template.id 
                             ? 'bg-black text-white border-black' 
                             : 'bg-white/50 text-gray-500 border-gray-100 group-hover:border-gray-300'}
                           transition-colors duration-200
                         `}>
                            {template.channel === 'EMAIL' ? 'Email' : 'WhatsApp'}
                         </span>
-                        {selectedTemplate?.id === template.id && (
+                        {selectedTemplateId === template.id && (
                            <motion.div layoutId="activeDot" className="w-1.5 h-1.5 rounded-full bg-black" />
                         )}
                       </div>
                       
                       <h3 className={`
                         font-serif text-xl italic leading-tight mb-1 transition-colors
-                        ${selectedTemplate?.id === template.id ? 'text-black' : 'text-gray-800 group-hover:text-black'}
+                        ${selectedTemplateId === template.id ? 'text-black' : 'text-gray-800 group-hover:text-black'}
                       `}>
                         {template.title}
                       </h3>
                       <p className={`
                         text-[11px] font-sans leading-relaxed line-clamp-2
-                        ${selectedTemplate?.id === template.id ? 'text-gray-600' : 'text-gray-400 group-hover:text-gray-500'}
+                        ${selectedTemplateId === template.id ? 'text-gray-600' : 'text-gray-400 group-hover:text-gray-500'}
                       `}>
                         {template.description}
                       </p>
@@ -254,7 +270,7 @@ const App: React.FC = () => {
                  <Editor 
                    key={selectedTemplate.id}
                    template={selectedTemplate} 
-                   onClose={() => setSelectedTemplate(null)} 
+                   onClose={handleCloseEditor} 
                  />
                ) : (
                  <motion.div 

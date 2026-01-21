@@ -13,7 +13,7 @@
     "react-dom": "18.2.0",
     "lucide-react": "0.344.0",
     "framer-motion": "11.0.8",
-    "@google/genai": "^1.38.0"
+    "zustand": "^5.0.10"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
