@@ -9,7 +9,8 @@ import {
   Pin,
   PinOff,
   Download,
-  Command
+  Command,
+  Sparkles
 } from 'lucide-react';
 import { Category } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -25,7 +26,8 @@ const IconMap: Record<string, React.FC<any>> = {
   Layers, 
   Clock: Calendar, 
   Sliders: SlidersHorizontal, 
-  Users: Users
+  Users: Users,
+  Sparkles: Sparkles
 };
 
 export const Sidebar: React.FC<SidebarProps> = ({ 

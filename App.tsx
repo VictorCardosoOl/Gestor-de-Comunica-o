@@ -200,7 +200,7 @@ const App: React.FC = () => {
                             : 'bg-white/50 text-gray-500 border-gray-100 group-hover:border-gray-300'}
                           transition-colors duration-200
                         `}>
-                           {template.channel === 'EMAIL' ? 'Email' : 'WhatsApp'}
+                           {template.channel === 'EMAIL' ? 'Email' : (template.channel === 'PROMPT' ? 'Prompt' : 'Chat')}
                         </span>
                         {selectedTemplate?.id === template.id && (
                            <motion.div layoutId="activeDot" className="w-1.5 h-1.5 rounded-full bg-black" />

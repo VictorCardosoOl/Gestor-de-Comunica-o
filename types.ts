@@ -1,6 +1,7 @@
 export enum CommunicationChannel {
   EMAIL = 'EMAIL',
-  WHATSAPP = 'WHATSAPP'
+  WHATSAPP = 'WHATSAPP',
+  PROMPT = 'PROMPT'
 }
 
 export interface Template {
