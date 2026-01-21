@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Template, CommunicationChannel } from '../types';
-import { Copy, RefreshCw, Check, MoveLeft, Sparkles, SlidersHorizontal, Loader2, Quote } from 'lucide-react';
+import { Copy, RefreshCw, Check, MoveLeft, Sparkles, SlidersHorizontal, Loader2, Quote, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { refineText } from '../services/geminiService';
 import { useTemplateCopier } from '../hooks/useTemplateCopier';
@@ -10,21 +10,24 @@ interface EditorProps {
   onClose: () => void;
 }
 
-// Physics configuration for "Heavy Glass" feel
-const springTransition = {
-  type: "spring",
-  stiffness: 120,
-  damping: 20,
-  mass: 1
+// Staggered children animation
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: { 
+    opacity: 1,
+    transition: { 
+      staggerChildren: 0.05,
+      delayChildren: 0.1 
+    }
+  }
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 20, scale: 0.98 },
+  hidden: { opacity: 0, y: 20 },
   visible: { 
     opacity: 1, 
     y: 0, 
-    scale: 1,
-    transition: springTransition
+    transition: { type: "spring", stiffness: 120, damping: 20 }
   }
 };
 
@@ -181,10 +184,9 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
 
   return (
     <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.5, ease: "easeInOut" }}
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
       className="h-full flex flex-col bg-transparent overflow-y-auto custom-scrollbar relative lg:rounded-3xl"
     >
       {/* Editorial Header */}
@@ -260,6 +262,16 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
             title="Resetar"
           >
             <RefreshCw size={18} strokeWidth={0.75} />
+          </motion.button>
+          
+          <motion.button
+            whileHover={{ scale: 1.1, rotate: 90 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={onClose}
+            className="hidden lg:flex p-2.5 md:p-3 rounded-full text-gray-400 hover:text-black hover:bg-white/40 transition-colors"
+            title="Fechar"
+          >
+            <X size={20} strokeWidth={1.5} />
           </motion.button>
         </div>
       </div>

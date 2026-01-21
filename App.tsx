@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Editor } from './components/Editor';
 import { INITIAL_TEMPLATES, CATEGORIES } from './constants';
@@ -58,10 +58,53 @@ const App: React.FC = () => {
       ? 'Visão Geral' 
       : CATEGORIES.find(c => c.id === selectedCategory)?.name || 'Módulo');
 
+  // Animation Variants
+  const editorPanelVariants = {
+    initial: { 
+      opacity: 0, 
+      x: 20,
+      scale: 0.98
+    },
+    animate: { 
+      opacity: 1, 
+      x: 0,
+      scale: 1,
+      transition: { 
+        type: "spring", 
+        stiffness: 100, 
+        damping: 20,
+        mass: 0.5 
+      }
+    },
+    exit: { 
+      opacity: 0, 
+      x: 20, 
+      transition: { duration: 0.2 } 
+    }
+  };
+
+  const mobileEditorVariants = {
+    initial: { y: '100%' },
+    animate: { 
+      y: 0,
+      transition: { type: "spring", damping: 25, stiffness: 200 }
+    },
+    exit: { 
+      y: '100%',
+      transition: { type: "spring", damping: 25, stiffness: 200 }
+    }
+  };
+
+  // Helper to detect if mobile for animation logic
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   return (
-    // Main Container
-    // FIX: Using h-[100dvh] for mobile browser consistency instead of h-screen
-    // FIX: Removed bg-[#f2f2f4] to allow index.html gradient to show through (Visual Consistency)
     <div className="flex h-[100dvh] w-full overflow-hidden text-[#111] font-sans bg-transparent">
       
       <Sidebar 
@@ -90,22 +133,23 @@ const App: React.FC = () => {
         <div className="flex-1 flex overflow-hidden w-full relative lg:p-4 lg:gap-4">
           
           {/* List Panel */}
-          <div className={`
-            flex flex-col shrink-0 relative z-20 transition-all duration-500
-            
-            /* Responsive Visibility Logic */
-            ${selectedTemplate ? 'hidden lg:flex' : 'flex w-full'}
-            
-            /* Desktop Width - FIX: Converted to REM for consistency with Sidebar and Typography */
-            lg:w-[24rem] xl:w-[28rem] 2xl:w-[32rem]
-            
-            /* Styles */
-            bg-gradient-to-b from-white/80 via-white/50 to-white/30
-            backdrop-blur-2xl
-            lg:border border-white/40
-            lg:shadow-sm
-            lg:rounded-3xl
-          `}>
+          {/* Added 'layout' prop for smooth width transition on desktop */}
+          <motion.div 
+            layout
+            className={`
+              flex flex-col shrink-0 relative z-20 
+              /* Logic: Always flex, but width changes. On mobile, it stays full width behind the overlay. */
+              flex w-full
+              ${selectedTemplate ? 'lg:w-[24rem] xl:w-[28rem] 2xl:w-[32rem]' : 'lg:w-full'}
+              
+              bg-gradient-to-b from-white/80 via-white/50 to-white/30
+              backdrop-blur-2xl
+              lg:border border-white/40
+              lg:shadow-sm
+              lg:rounded-3xl
+            `}
+            transition={{ type: "spring", stiffness: 120, damping: 20 }}
+          >
              <div className="absolute inset-0 opacity-[0.02] pointer-events-none mix-blend-multiply rounded-3xl" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }}></div>
 
             {/* Header Title */}
@@ -239,43 +283,57 @@ const App: React.FC = () => {
                )}
             </div>
 
-          </div>
+          </motion.div>
 
-          {/* Editor Panel */}
-          <div className={`
-            flex-1 h-full relative overflow-hidden min-w-0
-            /* Mobile: Fixed overlay if selected - FIX: Ensure solid background on mobile to prevent bleed-through */
-            ${selectedTemplate ? 'block fixed inset-0 z-50 lg:static bg-[#f5f5f7] lg:bg-transparent' : 'hidden lg:block lg:bg-transparent'}
-            lg:rounded-3xl
-            lg:border border-white/0
-            transition-all duration-300
-          `}>
-             <AnimatePresence mode="wait">
-               {selectedTemplate ? (
+          {/* Editor Panel Wrapper with AnimatePresence */}
+          <AnimatePresence mode="wait">
+            {selectedTemplate ? (
+              <motion.div
+                key="editor-panel"
+                className={`
+                  flex-1 h-full min-w-0
+                  /* Fixed on mobile to overlay, static on desktop to sit beside */
+                  fixed inset-0 z-50 lg:static 
+                  bg-[#f5f5f7] lg:bg-transparent
+                  lg:rounded-3xl lg:border border-white/0
+                `}
+                variants={isMobile ? mobileEditorVariants : editorPanelVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+              >
                  <Editor 
                    key={selectedTemplate.id}
                    template={selectedTemplate} 
                    onClose={() => setSelectedTemplate(null)} 
                  />
-               ) : (
-                 <motion.div 
-                   initial={{ opacity: 0 }}
-                   animate={{ opacity: 1 }}
-                   className="h-full flex flex-col items-center justify-center text-gray-300 select-none pointer-events-none p-4 text-center"
-                 >
-                   <div className="w-px h-16 md:h-24 bg-gradient-to-b from-transparent via-black/5 to-transparent mb-6"></div>
-                   <h3 className="text-4xl md:text-5xl font-serif italic text-black/10 mb-3 tracking-wide">Studio</h3>
-                   <div className="flex items-center gap-3">
-                     <span className="h-px w-8 bg-black/5"></span>
-                     <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-black/30 font-medium">
-                       Selecione um modelo
-                     </p>
-                     <span className="h-px w-8 bg-black/5"></span>
-                   </div>
-                 </motion.div>
-               )}
-             </AnimatePresence>
-          </div>
+              </motion.div>
+            ) : (
+              // Empty State (Desktop Only - hidden on mobile via layout)
+              // We hide this on mobile naturally because it sits 'under' or requires manual toggle. 
+              // Since we're using flex layout, let's keep it conditioned for desktop visibility.
+              !isMobile && (
+                <motion.div 
+                  key="empty-state"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="hidden lg:flex flex-1 h-full flex-col items-center justify-center text-gray-300 select-none pointer-events-none p-4 text-center"
+                >
+                  <div className="w-px h-16 md:h-24 bg-gradient-to-b from-transparent via-black/5 to-transparent mb-6"></div>
+                  <h3 className="text-4xl md:text-5xl font-serif italic text-black/10 mb-3 tracking-wide">Studio</h3>
+                  <div className="flex items-center gap-3">
+                    <span className="h-px w-8 bg-black/5"></span>
+                    <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-black/30 font-medium">
+                      Selecione um modelo
+                    </p>
+                    <span className="h-px w-8 bg-black/5"></span>
+                  </div>
+                </motion.div>
+              )
+            )}
+          </AnimatePresence>
+
         </div>
       </main>
     </div>
