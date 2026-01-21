@@ -3,27 +3,31 @@ import { Sidebar } from './components/Sidebar';
 import { Editor } from './components/Editor';
 import { INITIAL_TEMPLATES, CATEGORIES } from './constants';
 import { Template } from './types';
-import { Menu, Search, ArrowRight, Inbox, X, Loader2 } from 'lucide-react';
+import { Menu, Search, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useDebounce } from './hooks/useDebounce';
 
 const App: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Performance: Debounce search query by 300ms
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Search Logic
+  // Search Logic updated to use debounced query
   const filteredTemplates = useMemo(() => {
-    // Safety check if INITIAL_TEMPLATES is undefined/empty
     let filtered = INITIAL_TEMPLATES || [];
     
     // Normalize string to ignore accents and case
     const normalize = (str: string) => 
       str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "";
 
-    const query = normalize(searchQuery.trim());
+    const query = normalize(debouncedSearchQuery.trim());
 
     if (query) {
        filtered = filtered.filter(t => {
@@ -46,9 +50,9 @@ const App: React.FC = () => {
     }
 
     return filtered;
-  }, [selectedCategory, searchQuery]);
+  }, [selectedCategory, debouncedSearchQuery]);
 
-  const currentCategoryName = searchQuery 
+  const currentCategoryName = debouncedSearchQuery 
     ? `Resultados`
     : (selectedCategory === 'all' 
       ? 'Visão Geral' 
@@ -59,7 +63,7 @@ const App: React.FC = () => {
     <div className="flex h-screen w-full overflow-hidden text-[#111] font-sans bg-[#f2f2f4]">
       
       <Sidebar 
-        selectedCategory={searchQuery ? 'all' : selectedCategory} 
+        selectedCategory={debouncedSearchQuery ? 'all' : selectedCategory} 
         onSelectCategory={(id) => {
           setSelectedCategory(id);
           setSearchQuery(''); 
@@ -112,7 +116,7 @@ const App: React.FC = () => {
               >
                 <div className="flex flex-col gap-1">
                   <span className="text-[10px] font-sans font-bold uppercase tracking-[0.25em] text-gray-500 pl-1">
-                    {searchQuery ? 'Pesquisa' : 'Categoria'}
+                    {debouncedSearchQuery ? 'Pesquisa' : 'Categoria'}
                   </span>
                   <h2 className="text-4xl font-serif italic font-light text-black tracking-tight truncate pr-2">
                     {currentCategoryName}
@@ -170,7 +174,7 @@ const App: React.FC = () => {
                     </div>
                     <p className="font-serif italic text-xl text-black/60 mb-2">Nada encontrado</p>
                     <p className="text-xs text-gray-400 max-w-[200px] leading-relaxed">
-                      Não encontramos modelos para "{searchQuery}". Tente outra palavra-chave.
+                      Não encontramos modelos para "{debouncedSearchQuery}". Tente outra palavra-chave.
                     </p>
                   </div>
                 ) : (
@@ -226,7 +230,7 @@ const App: React.FC = () => {
                <span className="text-[10px] text-gray-400 font-medium">
                   {filteredTemplates.length} {filteredTemplates.length === 1 ? 'modelo' : 'modelos'}
                </span>
-               {searchQuery && (
+               {debouncedSearchQuery && (
                  <span className="text-[10px] text-gray-400 italic">
                    filtrado
                  </span>

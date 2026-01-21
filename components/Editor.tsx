@@ -3,6 +3,7 @@ import { Template, CommunicationChannel } from '../types';
 import { Copy, RefreshCw, Check, MoveLeft, Sparkles, SlidersHorizontal, Loader2, Quote } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { refineText } from '../services/geminiService';
+import { useTemplateCopier } from '../hooks/useTemplateCopier';
 
 interface EditorProps {
   template: Template;
@@ -39,19 +40,16 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
   const [variableValues, setVariableValues] = useState<Record<string, string>>({});
   const [showVariables, setShowVariables] = useState(true);
   
-  // Copy States
-  const [isCopiedMain, setIsCopiedMain] = useState(false);
-  const [isCopiedSecondary, setIsCopiedSecondary] = useState(false);
-  const [isCopiedSubject, setIsCopiedSubject] = useState(false);
-  const [copiedScenarios, setCopiedScenarios] = useState<Record<number, boolean>>({});
-
   const [isRefining, setIsRefining] = useState(false);
+
+  // Use Custom Hook for Copy Logic
+  const { copyToClipboard, isCopied } = useTemplateCopier();
 
   // Refs for auto-resizing textareas
   const mainTextareaRef = useRef<HTMLTextAreaElement>(null);
   const secondaryTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // --- SCENARIO LOGIC (New) ---
+  // --- SCENARIO LOGIC ---
   const isScenarioMode = useMemo(() => template.content.includes('[CENÁRIO:'), [template]);
 
   // --- HELPER FUNCTIONS ---
@@ -93,10 +91,6 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
     setContent(processTemplate(template.content)); 
     setSecondaryContent(processTemplate(template.secondaryContent || ''));
     setVariableValues({});
-    setIsCopiedMain(false);
-    setIsCopiedSecondary(false);
-    setIsCopiedSubject(false);
-    setCopiedScenarios({});
   }, [template, processTemplate]);
 
   // Auto-resize textareas when content changes or template loads
@@ -156,60 +150,10 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
     setVariableValues(prev => ({ ...prev, [placeholder]: newValue }));
     
     // Only replace in text, do not update 'content' state directly if in scenario mode to avoid breaking parser
-    // Actually, for simplicity, we will update content but Scenario parser is robust enough
     const replaceInText = (text: string) => text.split(oldValue).join(newValue);
     setSubject(prev => replaceInText(prev));
     setContent(prev => replaceInText(prev));
     setSecondaryContent(prev => replaceInText(prev));
-  };
-
-  const handleCopyGeneric = async (textToCopy: string, setCopiedState: (v: boolean) => void) => {
-    try {
-      const plainText = textToCopy;
-      let htmlContent = textToCopy
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/\n/g, "<br>")
-        .replace(/\*(.*?)\*/g, "<b>$1</b>")
-        .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2">$1</a>');
-
-      const fullHtml = `
-        <span style="font-family: 'Calibri', 'Segoe UI', sans-serif; font-size: 11pt; color: #000000; line-height: 1.5;">
-          ${htmlContent}
-        </span>
-      `;
-      if (typeof ClipboardItem !== 'undefined') {
-        const clipboardItem = new ClipboardItem({
-          'text/plain': new Blob([plainText], { type: 'text/plain' }),
-          'text/html': new Blob([fullHtml], { type: 'text/html' })
-        });
-        await navigator.clipboard.write([clipboardItem]);
-      } else {
-        await navigator.clipboard.writeText(textToCopy);
-      }
-      setCopiedState(true);
-      setTimeout(() => setCopiedState(false), 2000);
-    } catch (err) {
-      navigator.clipboard.writeText(textToCopy);
-      setCopiedState(true);
-      setTimeout(() => setCopiedState(false), 2000);
-    }
-  };
-
-  const handleCopyMain = () => handleCopyGeneric(content, setIsCopiedMain);
-  const handleCopySecondary = () => handleCopyGeneric(secondaryContent, setIsCopiedSecondary);
-  
-  const handleCopyScenario = (text: string, index: number) => {
-    handleCopyGeneric(text, (val) => {
-      setCopiedScenarios(prev => ({ ...prev, [index]: val }));
-    });
-  };
-
-  const handleCopySubject = () => {
-    navigator.clipboard.writeText(subject);
-    setIsCopiedSubject(true);
-    setTimeout(() => setIsCopiedSubject(false), 2000);
   };
 
   const handleReset = () => {
@@ -391,15 +335,15 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                        <motion.button
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
-                          onClick={() => handleCopyScenario(scene.text, idx)}
+                          onClick={() => copyToClipboard(scene.text, `scenario-${idx}`)}
                           className={`
                             px-4 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-widest border transition-all
-                            ${copiedScenarios[idx] 
+                            ${isCopied(`scenario-${idx}`)
                               ? 'bg-black text-white border-black' 
                               : 'bg-white/50 text-gray-600 border-gray-300 hover:border-black hover:text-black'}
                           `}
                        >
-                         {copiedScenarios[idx] ? 'Copiado' : 'Copiar'}
+                         {isCopied(`scenario-${idx}`) ? 'Copiado' : 'Copiar'}
                        </motion.button>
                     </div>
                     <div className="font-sans text-base leading-relaxed text-[#1a1a1a] whitespace-pre-wrap">
@@ -432,10 +376,10 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                       <motion.button 
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        onClick={handleCopySubject}
-                        className={`flex items-center gap-1.5 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.2em] hover:underline transition-colors font-sans ${isCopiedSubject ? 'text-black' : 'text-gray-400 hover:text-black'}`}
+                        onClick={() => copyToClipboard(subject, 'subject')}
+                        className={`flex items-center gap-1.5 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.2em] hover:underline transition-colors font-sans ${isCopied('subject') ? 'text-black' : 'text-gray-400 hover:text-black'}`}
                       >
-                        {isCopiedSubject ? <><Check size={12} strokeWidth={1.5} /><span>Copiado</span></> : <><Copy size={12} strokeWidth={1.5} /><span>Copiar Assunto</span></>}
+                        {isCopied('subject') ? <><Check size={12} strokeWidth={1.5} /><span>Copiado</span></> : <><Copy size={12} strokeWidth={1.5} /><span>Copiar Assunto</span></>}
                       </motion.button>
                     </div>
                     <input
@@ -508,36 +452,36 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={handleCopySecondary}
+              onClick={() => copyToClipboard(secondaryContent, 'secondary')}
               className={`
                 group relative overflow-hidden flex items-center justify-center gap-2 md:gap-3 px-6 md:px-8 py-3.5 md:py-4 transition-colors duration-300 rounded-full
-                ${isCopiedSecondary 
+                ${isCopied('secondary')
                   ? 'bg-black/90 text-white border-black/90 shadow-inner' 
                   : 'bg-transparent text-gray-700 border-gray-300 hover:border-black/50 hover:text-black hover:bg-white/40 hover:shadow-[0_0_20px_rgba(255,255,255,0.4)]'}
                 border backdrop-blur-sm
               `}
             >
-              {isCopiedSecondary ? <Check size={16} strokeWidth={0.75} /> : <Copy size={16} strokeWidth={0.75} />}
+              {isCopied('secondary') ? <Check size={16} strokeWidth={0.75} /> : <Copy size={16} strokeWidth={0.75} />}
               <span className="text-[9px] md:text-xs font-bold uppercase tracking-[0.2em] whitespace-nowrap font-sans">
-                {isCopiedSecondary ? 'Copiado' : `Copiar ${template.secondaryLabel ? 'Protocolo' : 'Secundário'}`}
+                {isCopied('secondary') ? 'Copiado' : `Copiar ${template.secondaryLabel ? 'Protocolo' : 'Secundário'}`}
               </span>
             </motion.button>
           )}
           <motion.button
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
-            onClick={handleCopyMain}
+            onClick={() => copyToClipboard(content, 'main')}
             className={`
               group relative overflow-hidden flex items-center justify-center gap-2 md:gap-3 px-8 md:px-12 py-3.5 md:py-4 transition-colors duration-300 rounded-full
-              ${isCopiedMain 
+              ${isCopied('main') 
                 ? 'bg-black text-white shadow-inner' 
                 : 'bg-white/80 text-black hover:bg-black hover:text-white border-white/50 hover:shadow-[0_0_25px_rgba(255,255,255,0.6)]'}
               border shadow-sm
             `}
           >
-            {isCopiedMain ? <Check size={16} strokeWidth={0.75} /> : <Copy size={16} strokeWidth={0.75} />}
+            {isCopied('main') ? <Check size={16} strokeWidth={0.75} /> : <Copy size={16} strokeWidth={0.75} />}
             <span className="text-[9px] md:text-xs font-bold uppercase tracking-[0.2em] whitespace-nowrap font-sans">
-              {isCopiedMain ? 'Copiado' : `Copiar ${template.secondaryContent ? 'Email' : 'Texto'}`}
+              {isCopied('main') ? 'Copiado' : `Copiar ${template.secondaryContent ? 'Email' : 'Texto'}`}
             </span>
           </motion.button>
         </div>
