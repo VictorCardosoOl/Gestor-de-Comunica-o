@@ -60,7 +60,9 @@ const App: React.FC = () => {
 
   return (
     // Main Container
-    <div className="flex h-screen w-full overflow-hidden text-[#111] font-sans bg-[#f2f2f4]">
+    // FIX: Using h-[100dvh] for mobile browser consistency instead of h-screen
+    // FIX: Removed bg-[#f2f2f4] to allow index.html gradient to show through (Visual Consistency)
+    <div className="flex h-[100dvh] w-full overflow-hidden text-[#111] font-sans bg-transparent">
       
       <Sidebar 
         selectedCategory={debouncedSearchQuery ? 'all' : selectedCategory} 
@@ -94,8 +96,8 @@ const App: React.FC = () => {
             /* Responsive Visibility Logic */
             ${selectedTemplate ? 'hidden lg:flex' : 'flex w-full'}
             
-            /* Desktop Width */
-            lg:w-[360px] xl:w-[420px] 2xl:w-[480px]
+            /* Desktop Width - FIX: Converted to REM for consistency with Sidebar and Typography */
+            lg:w-[24rem] xl:w-[28rem] 2xl:w-[32rem]
             
             /* Styles */
             bg-gradient-to-b from-white/80 via-white/50 to-white/30
@@ -242,9 +244,8 @@ const App: React.FC = () => {
           {/* Editor Panel */}
           <div className={`
             flex-1 h-full relative overflow-hidden min-w-0
-            /* Mobile: Fixed overlay if selected */
-            ${selectedTemplate ? 'block fixed inset-0 z-50 lg:static' : 'hidden lg:block'}
-            bg-[#f2f2f4] lg:bg-transparent
+            /* Mobile: Fixed overlay if selected - FIX: Ensure solid background on mobile to prevent bleed-through */
+            ${selectedTemplate ? 'block fixed inset-0 z-50 lg:static bg-[#f5f5f7] lg:bg-transparent' : 'hidden lg:block lg:bg-transparent'}
             lg:rounded-3xl
             lg:border border-white/0
             transition-all duration-300

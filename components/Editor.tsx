@@ -206,9 +206,10 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                   {template.channel === CommunicationChannel.EMAIL ? 'Email Template' : (template.channel === 'PROMPT' ? 'AI Prompt' : 'Message')}
                </span>
              </div>
+             {/* FIX: Fluid Typography using Clamp for stable scaling */}
              <motion.h1 
                layoutId={`title-${template.id}`}
-               className="font-serif italic text-3xl sm:text-4xl md:text-5xl text-black leading-[0.9] drop-shadow-sm font-light tracking-tight break-words hyphens-auto pr-2"
+               className="font-serif italic text-[clamp(1.75rem,2.5vw,3rem)] text-black leading-[0.9] drop-shadow-sm font-light tracking-tight break-words hyphens-auto pr-2"
              >
                {template.title}
              </motion.h1>
@@ -358,7 +359,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
               <motion.div 
                 variants={itemVariants}
                 className="
-                relative min-h-[250px] md:min-h-[450px] 
+                relative min-h-[25rem] md:min-h-[30rem] 
                 p-6 md:p-14
                 bg-gradient-to-br from-white/70 via-white/50 to-white/30
                 backdrop-blur-3xl
@@ -398,7 +399,8 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     style={{ fontFamily: 'Calibri, "Segoe UI", Carlito, sans-serif', fontSize: '12pt', lineHeight: '1.7', color: '#1a1a1a' }}
-                    className="w-full h-full min-h-[400px] md:min-h-[500px] bg-transparent border-none focus:ring-0 outline-none resize-none placeholder:text-gray-400/30 overflow-hidden"
+                    // FIX: Using REM for min-height consistency
+                    className="w-full h-full min-h-[25rem] md:min-h-[30rem] bg-transparent border-none focus:ring-0 outline-none resize-none placeholder:text-gray-400/30 overflow-hidden"
                     placeholder="Digite o conteúdo principal..."
                     spellCheck={false}
                     onInput={(e) => adjustTextareaHeight(e.target as HTMLTextAreaElement)}
@@ -410,7 +412,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                 <motion.div 
                   variants={itemVariants}
                   className="
-                  relative min-h-[200px] md:min-h-[300px] 
+                  relative min-h-[12rem] md:min-h-[18rem] 
                   p-6 md:p-14
                   bg-gradient-to-br from-white/70 via-white/50 to-white/30
                   backdrop-blur-3xl
@@ -433,7 +435,8 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                       value={secondaryContent}
                       onChange={(e) => setSecondaryContent(e.target.value)}
                       style={{ fontFamily: 'Calibri, "Segoe UI", Carlito, sans-serif', fontSize: '12pt', lineHeight: '1.7', color: '#1a1a1a' }}
-                      className="w-full h-full min-h-[150px] bg-transparent border-none focus:ring-0 outline-none resize-none placeholder:text-gray-400/30 overflow-hidden"
+                      // FIX: Using REM for min-height consistency
+                      className="w-full h-full min-h-[10rem] bg-transparent border-none focus:ring-0 outline-none resize-none placeholder:text-gray-400/30 overflow-hidden"
                       placeholder="Digite o conteúdo secundário..."
                       spellCheck={false}
                       onInput={(e) => adjustTextareaHeight(e.target as HTMLTextAreaElement)}
