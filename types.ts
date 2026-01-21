@@ -1,6 +1,7 @@
 export enum CommunicationChannel {
   EMAIL = 'EMAIL',
-  WHATSAPP = 'WHATSAPP'
+  WHATSAPP = 'WHATSAPP',
+  PROMPT = 'PROMPT'
 }
 
 export interface Template {
@@ -14,6 +15,7 @@ export interface Template {
   // New fields for dual-copy templates (e.g. Email + Internal Protocol)
   secondaryContent?: string;
   secondaryLabel?: string; 
+  tertiaryContent?: string; // Future proofing
 }
 
 export interface Category {

@@ -3,12 +3,14 @@ import { CATEGORIES } from '../constants';
 import { 
   GalleryVerticalEnd,
   Layers,
-  Clock3,
+  Calendar,
   SlidersHorizontal,
   Users,
   Pin,
   PinOff,
-  Download
+  Download,
+  Command,
+  Sparkles
 } from 'lucide-react';
 import { Category } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -21,10 +23,11 @@ interface SidebarProps {
 }
 
 const IconMap: Record<string, React.FC<any>> = {
-  Layers, // Implantação
-  Clock: Clock3, // Agendamento
-  Sliders: SlidersHorizontal, // Operacional
-  Users, // Relacionamento
+  Layers, 
+  Clock: Calendar, 
+  Sliders: SlidersHorizontal, 
+  Users: Users,
+  Sparkles: Sparkles
 };
 
 export const Sidebar: React.FC<SidebarProps> = ({ 
@@ -37,41 +40,39 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
-  const isExpanded = isOpen || isPinned || isHovered;
+  // Expanded logic: Pinned OR Hovered (Desktop), or Open (Mobile)
+  const isExpanded = (isPinned || isHovered) && !isOpen ? true : isOpen ? true : false;
+  // Width logic
+  const widthClass = isOpen ? 'w-[18rem]' : (isExpanded ? 'w-[18rem]' : 'w-[5.5rem]');
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
     };
-
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    };
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
 
   const handleInstallClick = () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
       deferredPrompt.userChoice.then((choiceResult: any) => {
-        if (choiceResult.outcome === 'accepted') {
-          setDeferredPrompt(null);
-        }
+        if (choiceResult.outcome === 'accepted') setDeferredPrompt(null);
       });
     }
   };
 
   return (
     <>
+      {/* Mobile Backdrop */}
       <AnimatePresence>
         {isOpen && (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-30 lg:hidden"
+            className="fixed inset-0 bg-black/5 backdrop-blur-sm z-[60] lg:hidden"
             onClick={onCloseMobile}
           />
         )}
@@ -79,170 +80,153 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       <aside 
         className={`
-          fixed inset-y-0 left-0 z-40
+          fixed inset-y-0 left-0 z-[70]
           flex flex-col h-full 
-          transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]
+          transition-[width,transform] duration-500 cubic-bezier(0.25, 0.1, 0.25, 1)
           ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           
-          /* Refined Dark Liquid Glass Effect */
-          bg-[#0f0f0f]/95
+          /* Refined Liquid Glass: Subtler, cleaner */
+          bg-gradient-to-b from-white/60 via-white/40 to-white/20
           backdrop-blur-2xl
-          border-r border-white/5
-          text-[#f2f2f2]
-          shadow-[20px_0_40px_rgba(0,0,0,0.1)]
+          border-r border-white/40
+          shadow-[4px_0_24px_-4px_rgba(0,0,0,0.02)]
         `}
-        style={{ 
-          width: isExpanded ? '18rem' : '5rem', 
-        }}
+        style={{ width: isOpen ? '18rem' : (isExpanded ? '18rem' : '5.5rem') }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {/* Pin Toggle */}
+        {/* Subtle Noise Texture overlay */}
+        <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-multiply z-0" 
+             style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }}>
+        </div>
+
+        {/* Pin Toggle (Desktop Only) */}
         <div className={`
-          hidden lg:flex absolute -right-3 top-10 z-50
+          hidden lg:flex absolute -right-3 top-9 z-50
           transition-all duration-300
           ${isExpanded ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2 pointer-events-none'}
         `}>
-          <button 
+          <motion.button 
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
             onClick={() => setIsPinned(!isPinned)}
-            className={`
-              w-6 h-6 text-black
-              flex items-center justify-center 
-              bg-white/90 backdrop-blur-md border border-white/40
-              hover:bg-white transition-all shadow-lg rounded-full
-            `}
+            className="w-6 h-6 flex items-center justify-center bg-white border border-white/60 shadow-sm rounded-full text-black/70 hover:text-black"
           >
-            {isPinned ? <Pin size={12} strokeWidth={1.5} /> : <PinOff size={12} strokeWidth={1.5} />}
-          </button>
+            {isPinned ? <Pin size={10} strokeWidth={1.5} /> : <PinOff size={10} strokeWidth={1.5} />}
+          </motion.button>
         </div>
 
-        {/* Brand */}
+        {/* Brand Section */}
         <div className={`
           relative px-6 py-10 flex items-center 
           ${!isExpanded ? 'justify-center' : 'justify-start'} 
-          transition-all duration-500 overflow-hidden
+          transition-all duration-500 shrink-0 z-10
         `}>
           <div className="shrink-0 flex items-center justify-center">
-             <div className="w-8 h-8 bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-md text-white flex items-center justify-center shadow-inner rounded-lg">
-                <span className="font-serif font-bold text-lg italic mt-0.5">Q</span>
+             <div className="w-10 h-10 bg-gradient-to-br from-white/80 to-white/40 border border-white/60 backdrop-blur-md text-black flex items-center justify-center shadow-sm rounded-xl">
+                <Command size={20} strokeWidth={1} />
              </div>
           </div>
           
           <div className={`
-            ml-4 flex flex-col
+            ml-4 flex flex-col justify-center overflow-hidden whitespace-nowrap
             transition-all duration-500
-            ${isExpanded ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4 absolute pointer-events-none'}
+            ${isExpanded ? 'opacity-100 max-w-[200px]' : 'opacity-0 max-w-0 pointer-events-none'}
           `}>
-            <h1 className="text-xl font-serif italic font-light tracking-wide text-white leading-none">
+            <h1 className="text-xl font-serif italic font-medium tracking-tight text-black leading-none">
               QuickComms
             </h1>
-            <span className="text-[9px] font-sans font-medium uppercase tracking-[0.25em] text-white/40 mt-1.5">Studio</span>
+            <span className="text-[9px] font-sans font-bold uppercase tracking-[0.2em] text-black/40 mt-1">Studio</span>
           </div>
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4 custom-scrollbar overflow-x-hidden">
-          <ul className="space-y-1">
-            <li key="all">
-              <button
-                onClick={() => {
-                  onSelectCategory('all');
-                  onCloseMobile();
-                }}
-                className={`
-                  relative w-full flex items-center transition-all duration-300 group rounded-xl
-                  ${!isExpanded ? 'justify-center py-4' : 'px-5 py-3.5 space-x-4'}
-                  ${selectedCategory === 'all'
-                    ? 'bg-white/10 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)]' 
-                    : 'text-white/40 hover:text-white hover:bg-white/5'}
-                `}
-              >
-                  <span className="shrink-0 flex items-center justify-center">
-                    <GalleryVerticalEnd size={18} strokeWidth={1.5} />
-                  </span>
-                  {isExpanded && (
-                    <span className="text-xs font-sans font-medium tracking-widest uppercase">Visão Geral</span>
-                  )}
-              </button>
-            </li>
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto px-3 py-2 custom-scrollbar overflow-x-hidden z-10 flex flex-col gap-1.5">
+            <motion.button
+              whileHover={{ scale: 1.01, backgroundColor: 'rgba(255,255,255,0.4)' }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                onSelectCategory('all');
+                onCloseMobile();
+              }}
+              className={`
+                relative w-full flex items-center transition-all duration-300 group rounded-xl
+                ${!isExpanded ? 'justify-center py-3' : 'px-4 py-3 space-x-3'}
+                ${selectedCategory === 'all'
+                  ? 'bg-white/50 text-black shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] border border-white/60' 
+                  : 'text-gray-500 hover:text-black hover:bg-white/20 border border-transparent'}
+              `}
+            >
+                <span className="shrink-0 flex items-center justify-center">
+                  <GalleryVerticalEnd size={20} strokeWidth={1} />
+                </span>
+                {isExpanded && (
+                  <span className="text-[11px] font-sans font-medium tracking-wide">Visão Geral</span>
+                )}
+            </motion.button>
 
-            <div className={`my-6 mx-6 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent transition-opacity duration-300 ${!isExpanded ? 'opacity-0' : 'opacity-100'}`} />
+            <div className={`my-3 mx-4 h-px bg-gradient-to-r from-transparent via-black/5 to-transparent transition-opacity duration-300 ${!isExpanded ? 'opacity-0' : 'opacity-100'}`} />
 
             {CATEGORIES.map((cat: Category) => {
               const Icon = IconMap[cat.icon] || GalleryVerticalEnd;
               const isSelected = selectedCategory === cat.id;
 
               return (
-                <li key={cat.id}>
-                  <button
-                    onClick={() => {
-                      onSelectCategory(cat.id);
-                      onCloseMobile();
-                    }}
-                    className={`
-                      relative w-full flex items-center transition-all duration-300 group rounded-xl
-                      ${!isExpanded ? 'justify-center py-4' : 'px-5 py-3.5 space-x-4'}
-                      ${isSelected 
-                        ? 'bg-white/10 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)]' 
-                        : 'text-white/40 hover:text-white hover:bg-white/5'}
-                    `}
-                  >
-                    <span className="shrink-0 flex items-center justify-center">
-                      <Icon size={18} strokeWidth={1.5} />
-                    </span>
-                    {isExpanded && (
-                      <span className="text-xs font-sans font-medium tracking-widest uppercase">{cat.name}</span>
-                    )}
-                  </button>
-                </li>
+                <motion.button
+                  key={cat.id}
+                  whileHover={{ scale: 1.01, backgroundColor: 'rgba(255,255,255,0.4)' }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    onSelectCategory(cat.id);
+                    onCloseMobile();
+                  }}
+                  className={`
+                    relative w-full flex items-center transition-all duration-300 group rounded-xl
+                    ${!isExpanded ? 'justify-center py-3' : 'px-4 py-3 space-x-3'}
+                    ${isSelected 
+                      ? 'bg-white/50 text-black shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] border border-white/60' 
+                      : 'text-gray-500 hover:text-black hover:bg-white/20 border border-transparent'}
+                  `}
+                >
+                  <span className="shrink-0 flex items-center justify-center">
+                    <Icon size={20} strokeWidth={1} />
+                  </span>
+                  {isExpanded && (
+                    <span className="text-[11px] font-sans font-medium tracking-wide">{cat.name}</span>
+                  )}
+                </motion.button>
               );
             })}
-          </ul>
-
-          {/* Install App Button */}
-          {deferredPrompt && (
-            <div className="mt-6 px-3 mb-4">
-               <button
-                onClick={handleInstallClick}
-                className={`
-                  relative w-full flex items-center transition-all duration-300 group rounded-xl border border-white/5
-                  ${!isExpanded ? 'justify-center py-4' : 'px-5 py-3.5 space-x-4'}
-                  text-white/40 hover:text-white hover:bg-white/5 hover:border-white/10
-                `}
-              >
-                <span className="shrink-0 flex items-center justify-center">
-                  <Download size={18} strokeWidth={1.5} />
-                </span>
-                {isExpanded && (
-                  <span className="text-xs font-sans font-medium tracking-widest uppercase">Instalar App</span>
-                )}
-              </button>
-            </div>
-          )}
         </nav>
 
-        {/* Footer Profile */}
-        <div className={`p-6 border-t border-white/5 bg-black/20 ${!isExpanded ? 'flex justify-center' : ''}`}>
-          <div className={`flex items-center gap-4 ${!isExpanded ? 'justify-center' : ''}`}>
-            <div className="shrink-0 w-9 h-9 bg-gradient-to-tr from-[#333] to-[#222] border border-white/10 flex items-center justify-center text-white font-serif italic text-sm shadow-inner rounded-full">
-              JS
-            </div>
-            <div className={`
-              flex-1 min-w-0 transition-all duration-300
-              ${isExpanded ? 'opacity-100' : 'opacity-0 hidden'}
-            `}>
-              <p className="text-xs font-sans font-bold uppercase tracking-widest text-white">João Silva</p>
-              <p className="text-[10px] text-white/40 mt-0.5">Pro Workspace</p>
-            </div>
+        {/* Install Button */}
+        {deferredPrompt && (
+          <div className="p-4 mt-auto shrink-0 z-10">
+              <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleInstallClick}
+              className={`
+                relative w-full flex items-center transition-colors duration-300 group rounded-xl border border-black/5 bg-white/10 hover:bg-white/30
+                ${!isExpanded ? 'justify-center py-3' : 'px-4 py-3 space-x-3'}
+                text-gray-500 hover:text-black
+              `}
+            >
+              <span className="shrink-0 flex items-center justify-center">
+                <Download size={18} strokeWidth={1} />
+              </span>
+              {isExpanded && (
+                <span className="text-[10px] font-sans font-bold tracking-[0.1em] uppercase">Instalar App</span>
+              )}
+            </motion.button>
           </div>
-        </div>
+        )}
       </aside>
       
+      {/* Spacer for flow */}
       <div 
-        className={`hidden lg:block shrink-0 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]`}
-        style={{ 
-          width: isPinned ? '18rem' : '5rem' 
-        }}
+        className={`hidden lg:block shrink-0 transition-[width] duration-500 cubic-bezier(0.25, 0.1, 0.25, 1)`}
+        style={{ width: isPinned ? '18rem' : '5.5rem' }}
       />
     </>
   );

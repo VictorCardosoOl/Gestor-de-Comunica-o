@@ -1,27 +1,60 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Template, CommunicationChannel } from '../types';
-import { Copy, RefreshCw, Check, MoveLeft, Sparkles, SlidersHorizontal } from 'lucide-react';
+import { Copy, RefreshCw, Check, MoveLeft, Sparkles, SlidersHorizontal, Loader2, Quote } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { refineText } from '../services/geminiService';
 
 interface EditorProps {
   template: Template;
   onClose: () => void;
 }
 
+// Physics configuration for "Heavy Glass" feel
+const springTransition = {
+  type: "spring",
+  stiffness: 120,
+  damping: 20,
+  mass: 1
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20, scale: 0.98 },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    scale: 1,
+    transition: springTransition
+  }
+};
+
+interface Scenario {
+  title: string;
+  text: string;
+}
+
 export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
   const [subject, setSubject] = useState(template.subject || '');
   const [content, setContent] = useState(template.content);
   const [secondaryContent, setSecondaryContent] = useState(template.secondaryContent || '');
-  
-  // State to track the *current* value of each variable placeholder
   const [variableValues, setVariableValues] = useState<Record<string, string>>({});
-  
   const [showVariables, setShowVariables] = useState(true);
+  
+  // Copy States
   const [isCopiedMain, setIsCopiedMain] = useState(false);
   const [isCopiedSecondary, setIsCopiedSecondary] = useState(false);
   const [isCopiedSubject, setIsCopiedSubject] = useState(false);
+  const [copiedScenarios, setCopiedScenarios] = useState<Record<number, boolean>>({});
 
-  // Helper functions
+  const [isRefining, setIsRefining] = useState(false);
+
+  // Refs for auto-resizing textareas
+  const mainTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const secondaryTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // --- SCENARIO LOGIC (New) ---
+  const isScenarioMode = useMemo(() => template.content.includes('[CENÁRIO:'), [template]);
+
+  // --- HELPER FUNCTIONS ---
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour >= 5 && hour < 12) return 'Bom dia';
@@ -41,7 +74,6 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
     if (currentDay === 5) daysToAdd = 3;
     else if (currentDay === 6) daysToAdd = 2;
     date.setDate(date.getDate() + daysToAdd);
-    
     const str = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(date);
     return str.charAt(0).toUpperCase() + str.slice(1);
   };
@@ -57,42 +89,75 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
 
   useEffect(() => {
     setSubject(template.subject || '');
-    setContent(processTemplate(template.content));
+    // Process content to apply automated variables like [Saudação] immediately
+    setContent(processTemplate(template.content)); 
     setSecondaryContent(processTemplate(template.secondaryContent || ''));
     setVariableValues({});
     setIsCopiedMain(false);
     setIsCopiedSecondary(false);
     setIsCopiedSubject(false);
+    setCopiedScenarios({});
   }, [template, processTemplate]);
 
-  // --- SYNC LOGIC ---
+  // Auto-resize textareas when content changes or template loads
+  const adjustTextareaHeight = (element: HTMLTextAreaElement | null) => {
+    if (element) {
+      element.style.height = 'auto';
+      element.style.height = element.scrollHeight + 'px';
+    }
+  };
+
+  useEffect(() => {
+    // Small timeout to ensure render is complete
+    const timer = setTimeout(() => {
+      adjustTextareaHeight(mainTextareaRef.current);
+      adjustTextareaHeight(secondaryTextareaRef.current);
+    }, 10);
+    return () => clearTimeout(timer);
+  }, [content, secondaryContent, isScenarioMode, template.id]);
+
+  // Recalculate scenarios based on the processed content
+  const scenarios: Scenario[] = useMemo(() => {
+    if (!isScenarioMode) return [];
+    // Split by bracket but preserve content logic
+    const rawSegments = content.split('[').filter(s => s.trim().length > 0);
+    
+    return rawSegments.map(seg => {
+      if (!seg.startsWith('CENÁRIO:')) return null;
+      
+      const closingBracketIndex = seg.indexOf(']');
+      if (closingBracketIndex === -1) return null;
+
+      const title = seg.substring(8, closingBracketIndex).trim(); // Remove 'CENÁRIO: '
+      const text = seg.substring(closingBracketIndex + 1).trim();
+      
+      return { title, text };
+    }).filter((item): item is Scenario => item !== null);
+  }, [content, isScenarioMode]);
+
+  // Sync Logic (Filtered to ignore Scenarios)
   const placeholders = useMemo(() => {
     const regex = /\[(.*?)\]/g;
     const allText = `${template.subject || ''} ${template.content} ${template.secondaryContent || ''} ${template.tertiaryContent || ''}`;
     const found = allText.match(regex);
     if (!found) return [];
-    
     const unique = Array.from(new Set(found));
     return unique.filter(p => 
       !p.includes('Saudação') && 
       !p.includes('Data Hoje') && 
-      !p.includes('Data Extenso')
+      !p.includes('Data Extenso') &&
+      !p.includes('CENÁRIO') // CRITICAL: Ignore scenario tags
     );
   }, [template]);
 
   const handleVariableChange = (placeholder: string, inputValue: string) => {
     const oldValue = variableValues[placeholder] || placeholder;
     const newValue = inputValue === '' ? placeholder : inputValue;
-
-    setVariableValues(prev => ({
-      ...prev,
-      [placeholder]: newValue
-    }));
-
-    const replaceInText = (text: string) => {
-        return text.split(oldValue).join(newValue);
-    };
-
+    setVariableValues(prev => ({ ...prev, [placeholder]: newValue }));
+    
+    // Only replace in text, do not update 'content' state directly if in scenario mode to avoid breaking parser
+    // Actually, for simplicity, we will update content but Scenario parser is robust enough
+    const replaceInText = (text: string) => text.split(oldValue).join(newValue);
     setSubject(prev => replaceInText(prev));
     setContent(prev => replaceInText(prev));
     setSecondaryContent(prev => replaceInText(prev));
@@ -114,7 +179,6 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
           ${htmlContent}
         </span>
       `;
-
       if (typeof ClipboardItem !== 'undefined') {
         const clipboardItem = new ClipboardItem({
           'text/plain': new Blob([plainText], { type: 'text/plain' }),
@@ -135,6 +199,12 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
 
   const handleCopyMain = () => handleCopyGeneric(content, setIsCopiedMain);
   const handleCopySecondary = () => handleCopyGeneric(secondaryContent, setIsCopiedSecondary);
+  
+  const handleCopyScenario = (text: string, index: number) => {
+    handleCopyGeneric(text, (val) => {
+      setCopiedScenarios(prev => ({ ...prev, [index]: val }));
+    });
+  };
 
   const handleCopySubject = () => {
     navigator.clipboard.writeText(subject);
@@ -143,11 +213,25 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
   };
 
   const handleReset = () => {
-    if (window.confirm('Restaurar texto original e variáveis?')) {
+    if (window.confirm('Restaurar texto original?')) {
       setSubject(template.subject || '');
-      setContent(processTemplate(template.content));
+      setContent(processTemplate(template.content)); // Reset to processed
       setSecondaryContent(processTemplate(template.secondaryContent || ''));
       setVariableValues({});
+    }
+  };
+  
+  const handleAiRefine = async () => {
+    if (!content || isRefining) return;
+    setIsRefining(true);
+    try {
+      const refined = await refineText(content, `Canal: ${template.channel}. Objetivo: Melhorar clareza, correção gramatical e tom profissional. Mantenha estritamente as variáveis.`);
+      setContent(refined);
+    } catch (error) {
+      console.error(error);
+      alert('Não foi possível conectar à IA no momento.');
+    } finally {
+      setIsRefining(false);
     }
   };
 
@@ -156,78 +240,113 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.4 }}
-      className="h-full flex flex-col bg-transparent overflow-hidden"
+      transition={{ duration: 0.5, ease: "easeInOut" }}
+      className="h-full flex flex-col bg-transparent overflow-y-auto custom-scrollbar relative lg:rounded-3xl"
     >
-      {/* Editorial Header - Glass */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between px-6 md:px-10 py-6 md:py-8 shrink-0 gap-4 border-b border-black/5 relative z-20 bg-white/40 backdrop-blur-md">
-        <div className="flex items-center space-x-4 md:space-x-6">
-          <button 
+      {/* Editorial Header */}
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between px-6 md:px-12 py-6 md:py-8 shrink-0 gap-6 border-b border-white/30 relative z-20 bg-gradient-to-b from-white/70 via-white/50 to-white/20 backdrop-blur-2xl">
+        <div className="flex items-start md:items-center space-x-4 md:space-x-6">
+          <motion.button 
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
             onClick={onClose}
-            className="lg:hidden group flex items-center gap-2 text-black hover:opacity-50 transition-opacity"
+            className="lg:hidden group flex items-center gap-2 text-black hover:opacity-50 transition-opacity mt-1 md:mt-0"
           >
-            <MoveLeft size={20} strokeWidth={1.5} />
-          </button>
+            <MoveLeft size={24} strokeWidth={0.75} />
+          </motion.button>
           
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 min-w-0">
              <div className="flex items-center gap-3">
                <span className="w-1.5 h-1.5 bg-black/80 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.2)]"></span>
-               <span className="text-[10px] font-sans font-bold uppercase tracking-[0.2em] text-black/60">
-                  {template.channel === CommunicationChannel.EMAIL ? 'Email Template' : 'Message Template'}
+               <span className="text-[9px] font-sans font-bold uppercase tracking-[0.25em] text-black/60">
+                  {template.channel === CommunicationChannel.EMAIL ? 'Email Template' : (template.channel === 'PROMPT' ? 'AI Prompt' : 'Message')}
                </span>
              </div>
-             <h1 className="font-serif italic text-3xl md:text-5xl text-black leading-none drop-shadow-sm font-light">{template.title}</h1>
+             <motion.h1 
+               layoutId={`title-${template.id}`}
+               className="font-serif italic text-3xl sm:text-4xl md:text-5xl text-black leading-[0.9] drop-shadow-sm font-light tracking-tight break-words hyphens-auto pr-2"
+             >
+               {template.title}
+             </motion.h1>
           </div>
         </div>
         
-        <div className="flex items-center gap-4 self-end md:self-auto">
-          {placeholders.length > 0 && (
-             <button 
-              onClick={() => setShowVariables(!showVariables)}
-              className={`p-3 rounded-full transition-all duration-300 backdrop-blur-sm border border-black/5 ${showVariables ? 'bg-white/70 text-black shadow-md' : 'text-gray-500 hover:text-black hover:bg-white/40'}`}
-              title="Toggle Variables"
+        <div className="flex flex-wrap items-center gap-2 md:gap-3 self-start md:self-auto pt-2 xl:pt-0">
+          {!isScenarioMode && (
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleAiRefine}
+              disabled={isRefining}
+              className={`
+                flex items-center gap-2 px-4 py-2 md:px-5 md:py-2.5 rounded-full transition-colors duration-300
+                ${isRefining 
+                  ? 'bg-white/50 text-black/40 cursor-wait' 
+                  : 'bg-white/40 hover:bg-white/80 border border-white/40 shadow-sm hover:shadow-md text-gray-800'}
+              `}
             >
-              <SlidersHorizontal size={18} strokeWidth={1.5} />
-            </button>
+              {isRefining ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} strokeWidth={0.75} className="text-gray-600" />}
+              <span className="text-[9px] font-bold uppercase tracking-[0.2em] font-sans">
+                {isRefining ? 'Processando' : 'Otimizar'}
+              </span>
+            </motion.button>
           )}
-          <button 
+
+          <div className="hidden sm:block w-px h-6 bg-black/10 mx-1"></div>
+
+          {placeholders.length > 0 && (
+             <motion.button 
+              whileHover={{ scale: 1.1, rotate: 90 }}
+              whileTap={{ scale: 0.9 }}
+              transition={{ type: "spring", stiffness: 200, damping: 10 }}
+              onClick={() => setShowVariables(!showVariables)}
+              className={`p-2.5 md:p-3 rounded-full transition-colors duration-300 backdrop-blur-sm border border-transparent ${showVariables ? 'bg-white/70 text-black shadow-md border-white/40' : 'text-gray-500 hover:text-black hover:bg-white/40'}`}
+              title="Alternar Variáveis"
+            >
+              <SlidersHorizontal size={18} strokeWidth={0.75} />
+            </motion.button>
+          )}
+          <motion.button 
+            whileHover={{ rotate: 180 }}
+            whileTap={{ scale: 0.9 }}
+            transition={{ type: "spring", stiffness: 200, damping: 15 }}
             onClick={handleReset}
-            className="text-gray-500 hover:text-black transition-colors p-3 hover:bg-white/40 rounded-full"
-            title="Reset"
+            className="text-gray-500 hover:text-black transition-colors p-2.5 md:p-3 hover:bg-white/40 rounded-full"
+            title="Resetar"
           >
-            <RefreshCw size={18} strokeWidth={1.5} />
-          </button>
+            <RefreshCw size={18} strokeWidth={0.75} />
+          </motion.button>
         </div>
       </div>
 
-       {/* Variables Panel (Smart Sync) - Glass */}
-       <AnimatePresence>
+       <AnimatePresence initial={false}>
         {placeholders.length > 0 && showVariables && (
           <motion.div 
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="bg-white/30 backdrop-blur-lg border-b border-white/20 shrink-0 relative z-20 overflow-hidden shadow-sm"
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="bg-white/30 backdrop-blur-2xl border-b border-white/30 shrink-0 relative z-20 overflow-hidden shadow-sm origin-top"
           >
-            <div className="px-6 md:px-10 py-8">
-              <div className="flex items-center gap-2 mb-8 text-black/70">
-                <Sparkles size={14} />
-                <span className="text-[10px] font-bold uppercase tracking-widest font-sans">Preenchimento Automático</span>
+            <div className="px-6 md:px-12 py-8 md:py-10">
+              <div className="flex items-center gap-2 mb-6 md:mb-8 text-black/70">
+                <Sparkles size={14} strokeWidth={1} />
+                <span className="text-[9px] font-bold uppercase tracking-[0.25em] font-sans">Preenchimento Automático</span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-10 gap-y-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-12 gap-y-8 md:gap-y-10">
                 {placeholders.map((placeholder) => (
                   <div key={placeholder} className="relative group">
                     <input 
                       type="text" 
                       id={placeholder}
-                      className="peer w-full bg-transparent border-b border-black/10 focus:border-black/80 text-base py-2 transition-all outline-none font-serif italic text-black placeholder-transparent"
+                      className="peer w-full bg-transparent border-b border-black/10 focus:border-black/80 text-base md:text-lg py-2 transition-all outline-none font-serif italic text-black placeholder-transparent"
                       placeholder={placeholder}
                       value={variableValues[placeholder] === placeholder ? '' : variableValues[placeholder]} 
                       onChange={(e) => handleVariableChange(placeholder, e.target.value)}
                     />
                     <label 
                       htmlFor={placeholder}
-                      className="absolute left-0 -top-3 text-[9px] font-sans font-bold uppercase tracking-widest text-gray-400 transition-all peer-placeholder-shown:text-xs peer-placeholder-shown:top-2 peer-placeholder-shown:text-gray-400/70 peer-focus:-top-3 peer-focus:text-[9px] peer-focus:text-black cursor-text"
+                      className="absolute left-0 -top-4 text-[9px] font-sans font-bold uppercase tracking-[0.2em] text-gray-400 transition-all peer-placeholder-shown:text-xs peer-placeholder-shown:top-2.5 peer-placeholder-shown:text-gray-400/70 peer-focus:-top-4 peer-focus:text-[9px] peer-focus:text-black cursor-text"
                     >
                       {placeholder.replace('[', '').replace(']', '')}
                     </label>
@@ -239,154 +358,190 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
         )}
       </AnimatePresence>
 
-      {/* Editor Surface */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar px-4 lg:px-10 py-6 md:py-10">
-        <div className="max-w-4xl mx-auto flex flex-col gap-8 md:gap-10">
-          
-          {/* Main Content Card - Liquid Glass */}
-          <div className="
-            relative min-h-[400px] p-8 md:p-14
-            bg-white/40 backdrop-blur-xl 
-            border border-white/40 
-            shadow-[0_20px_40px_-5px_rgba(0,0,0,0.03)]
-            rounded-2xl
-          ">
-             {/* Paper Texture Overlay */}
-            <div className="absolute inset-0 pointer-events-none opacity-[0.02] mix-blend-multiply rounded-2xl" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'6\' height=\'6\' viewBox=\'0 0 6 6\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'%23000000\' fill-opacity=\'1\' fill-rule=\'evenodd\'%3E%3Cpath d=\'M5 0h1L0 6V5zM6 5v1H5z\'/%3E%3C/g%3E%3C/svg%3E")' }}></div>
-            
-            {/* Glossy sheen gradient */}
-            <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-white/70 via-transparent to-white/10 rounded-2xl"></div>
-
-            {template.channel === CommunicationChannel.EMAIL && (
-              <div className="mb-8 relative z-10 group">
-                 <div className="flex justify-between items-end mb-3 border-b border-black/5 pb-2">
-                  <label className="text-[10px] font-sans font-bold uppercase tracking-widest text-gray-400">Assunto</label>
-                  
-                  <button 
-                    onClick={handleCopySubject}
-                    className={`
-                      flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider hover:underline transition-all font-sans
-                      ${isCopiedSubject ? 'text-black' : 'text-gray-400 hover:text-black'}
-                    `}
+      <div className="flex-1 px-4 lg:px-12 py-6 md:py-12">
+        <motion.div 
+          className="max-w-4xl mx-auto flex flex-col gap-6 md:gap-12 pb-24 md:pb-20"
+          initial="hidden"
+          animate="visible"
+          variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
+        >
+          {/* --- SCENARIO LIST MODE --- */}
+          {isScenarioMode ? (
+             <div className="grid grid-cols-1 gap-6">
+                {scenarios.map((scene, idx) => (
+                  <motion.div 
+                    key={idx}
+                    variants={itemVariants}
+                    className="
+                      relative p-6 md:p-8
+                      bg-gradient-to-br from-white/70 via-white/50 to-white/30
+                      backdrop-blur-3xl border border-white/50 
+                      shadow-[0_10px_30px_-10px_rgba(0,0,0,0.05)]
+                      rounded-2xl
+                      flex flex-col gap-4
+                    "
                   >
-                    {isCopiedSubject ? (
-                      <>
-                        <Check size={12} strokeWidth={2} />
-                        <span>Copiado</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={12} strokeWidth={2} />
-                        <span>Copiar Assunto</span>
-                      </>
-                    )}
-                  </button>
-                 </div>
-                <input
-                  type="text"
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  className="w-full py-2 bg-transparent border-none focus:ring-0 outline-none text-black font-serif italic text-xl md:text-2xl placeholder:text-gray-400/30"
-                  placeholder="Insira o assunto..."
-                />
-              </div>
-            )}
+                    <div className="flex justify-between items-center border-b border-black/5 pb-3">
+                       <div className="flex items-center gap-2">
+                         <Quote size={14} className="text-black/40" />
+                         <h3 className="text-xs font-bold uppercase tracking-widest text-black/70">
+                           {scene.title}
+                         </h3>
+                       </div>
+                       <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => handleCopyScenario(scene.text, idx)}
+                          className={`
+                            px-4 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-widest border transition-all
+                            ${copiedScenarios[idx] 
+                              ? 'bg-black text-white border-black' 
+                              : 'bg-white/50 text-gray-600 border-gray-300 hover:border-black hover:text-black'}
+                          `}
+                       >
+                         {copiedScenarios[idx] ? 'Copiado' : 'Copiar'}
+                       </motion.button>
+                    </div>
+                    <div className="font-sans text-base leading-relaxed text-[#1a1a1a] whitespace-pre-wrap">
+                      {scene.text}
+                    </div>
+                  </motion.div>
+                ))}
+             </div>
+          ) : (
+            /* --- STANDARD EDITOR MODE --- */
+            <>
+              <motion.div 
+                variants={itemVariants}
+                className="
+                relative min-h-[250px] md:min-h-[450px] 
+                p-6 md:p-14
+                bg-gradient-to-br from-white/70 via-white/50 to-white/30
+                backdrop-blur-3xl
+                border border-white/50 
+                shadow-[0_20px_40px_-10px_rgba(0,0,0,0.05)]
+                rounded-2xl md:rounded-3xl
+                "
+              >
+                <div className="absolute inset-0 pointer-events-none opacity-[0.03] mix-blend-multiply rounded-2xl md:rounded-3xl" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'6\' height=\'6\' viewBox=\'0 0 6 6\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'%23000000\' fill-opacity=\'1\' fill-rule=\'evenodd\'%3E%3Cpath d=\'M5 0h1L0 6V5zM6 5v1H5z\'/%3E%3C/g%3E%3C/svg%3E")' }}></div>
+                
+                {template.channel === CommunicationChannel.EMAIL && (
+                  <div className="mb-6 md:mb-10 relative z-10 group">
+                    <div className="flex flex-wrap justify-between items-end mb-2 md:mb-3 border-b border-black/5 pb-2 gap-2">
+                      <label className="text-[9px] md:text-[10px] font-sans font-bold uppercase tracking-[0.2em] text-gray-400">Assunto</label>
+                      <motion.button 
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleCopySubject}
+                        className={`flex items-center gap-1.5 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.2em] hover:underline transition-colors font-sans ${isCopiedSubject ? 'text-black' : 'text-gray-400 hover:text-black'}`}
+                      >
+                        {isCopiedSubject ? <><Check size={12} strokeWidth={1.5} /><span>Copiado</span></> : <><Copy size={12} strokeWidth={1.5} /><span>Copiar Assunto</span></>}
+                      </motion.button>
+                    </div>
+                    <input
+                      type="text"
+                      value={subject}
+                      onChange={(e) => setSubject(e.target.value)}
+                      className="w-full py-2 bg-transparent border-none focus:ring-0 outline-none text-black font-serif italic text-xl md:text-3xl placeholder:text-gray-400/30 font-light"
+                      placeholder="Insira o assunto..."
+                    />
+                  </div>
+                )}
 
-            <div className="relative z-10 h-full flex flex-col">
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                style={{
-                  fontFamily: 'Calibri, "Segoe UI", Carlito, sans-serif',
-                  fontSize: '11pt', 
-                  lineHeight: '1.6',
-                  color: '#1a1a1a'
-                }}
-                className="w-full h-full min-h-[300px] bg-transparent border-none focus:ring-0 outline-none resize-none placeholder:text-gray-400/30"
-                placeholder="Digite o conteúdo principal..."
-                spellCheck={false}
-              />
-            </div>
-          </div>
-
-          {/* Secondary Content Card - Liquid Glass */}
-          {secondaryContent !== '' && (
-            <div className="
-              relative min-h-[300px] p-8 md:p-14
-              bg-white/40 backdrop-blur-xl 
-              border border-white/40 
-              shadow-[0_20px_40px_-5px_rgba(0,0,0,0.03)]
-              rounded-2xl
-            ">
-              <div className="absolute inset-0 pointer-events-none opacity-[0.02] mix-blend-multiply rounded-2xl" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'6\' height=\'6\' viewBox=\'0 0 6 6\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'%23000000\' fill-opacity=\'1\' fill-rule=\'evenodd\'%3E%3Cpath d=\'M5 0h1L0 6V5zM6 5v1H5z\'/%3E%3C/g%3E%3C/svg%3E")' }}></div>
-              <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-white/70 via-transparent to-white/10 rounded-2xl"></div>
-              
-              <div className="mb-8 relative z-10">
-                <div className="flex items-center gap-3 border-b border-black/5 pb-2">
-                   <div className="w-1.5 h-1.5 bg-black/60 rotate-45"></div>
-                   <label className="text-[10px] font-sans font-bold uppercase tracking-widest text-gray-500">
-                     {template.secondaryLabel || 'Conteúdo Adicional'}
-                   </label>
+                <div className="relative z-10 h-full flex flex-col">
+                  <textarea
+                    ref={mainTextareaRef}
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    style={{ fontFamily: 'Calibri, "Segoe UI", Carlito, sans-serif', fontSize: '12pt', lineHeight: '1.7', color: '#1a1a1a' }}
+                    className="w-full h-full min-h-[400px] md:min-h-[500px] bg-transparent border-none focus:ring-0 outline-none resize-none placeholder:text-gray-400/30 overflow-hidden"
+                    placeholder="Digite o conteúdo principal..."
+                    spellCheck={false}
+                    onInput={(e) => adjustTextareaHeight(e.target as HTMLTextAreaElement)}
+                  />
                 </div>
-              </div>
+              </motion.div>
 
-              <div className="relative z-10 h-full flex flex-col">
-                <textarea
-                  value={secondaryContent}
-                  onChange={(e) => setSecondaryContent(e.target.value)}
-                  style={{
-                    fontFamily: 'Calibri, "Segoe UI", Carlito, sans-serif',
-                    fontSize: '11pt', 
-                    lineHeight: '1.6',
-                    color: '#1a1a1a'
-                  }}
-                  className="w-full h-full min-h-[200px] bg-transparent border-none focus:ring-0 outline-none resize-none placeholder:text-gray-400/30"
-                  placeholder="Digite o conteúdo secundário..."
-                  spellCheck={false}
-                />
-              </div>
-            </div>
+              {secondaryContent !== '' && (
+                <motion.div 
+                  variants={itemVariants}
+                  className="
+                  relative min-h-[200px] md:min-h-[300px] 
+                  p-6 md:p-14
+                  bg-gradient-to-br from-white/70 via-white/50 to-white/30
+                  backdrop-blur-3xl
+                  border border-white/50 
+                  shadow-[0_20px_40px_-10px_rgba(0,0,0,0.05)]
+                  rounded-2xl md:rounded-3xl
+                ">
+                  <div className="absolute inset-0 pointer-events-none opacity-[0.03] mix-blend-multiply rounded-2xl md:rounded-3xl" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'6\' height=\'6\' viewBox=\'0 0 6 6\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'%23000000\' fill-opacity=\'1\' fill-rule=\'evenodd\'%3E%3Cpath d=\'M5 0h1L0 6V5zM6 5v1H5z\'/%3E%3C/g%3E%3C/svg%3E")' }}></div>
+                  <div className="mb-6 md:mb-10 relative z-10">
+                    <div className="flex items-center gap-3 border-b border-black/5 pb-2">
+                      <div className="w-1.5 h-1.5 bg-black/60 rotate-45"></div>
+                      <label className="text-[9px] md:text-[10px] font-sans font-bold uppercase tracking-[0.2em] text-gray-500">
+                        {template.secondaryLabel || 'Conteúdo Adicional'}
+                      </label>
+                    </div>
+                  </div>
+                  <div className="relative z-10 h-full flex flex-col">
+                    <textarea
+                      ref={secondaryTextareaRef}
+                      value={secondaryContent}
+                      onChange={(e) => setSecondaryContent(e.target.value)}
+                      style={{ fontFamily: 'Calibri, "Segoe UI", Carlito, sans-serif', fontSize: '12pt', lineHeight: '1.7', color: '#1a1a1a' }}
+                      className="w-full h-full min-h-[150px] bg-transparent border-none focus:ring-0 outline-none resize-none placeholder:text-gray-400/30 overflow-hidden"
+                      placeholder="Digite o conteúdo secundário..."
+                      spellCheck={false}
+                      onInput={(e) => adjustTextareaHeight(e.target as HTMLTextAreaElement)}
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </>
           )}
-          
-          <div className="h-20"></div>
-        </div>
+        </motion.div>
       </div>
 
-      {/* Footer Actions - Glass */}
-      <div className="px-6 md:px-10 py-6 bg-white/40 backdrop-blur-xl flex flex-wrap justify-end items-center sticky bottom-0 z-20 gap-3 md:gap-4 border-t border-white/20">
-        
-        {/* Secondary Copy Button */}
-        {template.secondaryContent && (
-          <button
-            onClick={handleCopySecondary}
+      {!isScenarioMode && (
+        <div className="sticky bottom-0 z-30 px-6 md:px-12 py-6 md:py-8 bg-gradient-to-t from-white/70 via-white/50 to-white/30 backdrop-blur-2xl flex flex-col sm:flex-row sm:justify-end items-stretch sm:items-center gap-3 md:gap-4 border-t border-white/30">
+          {template.secondaryContent && (
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleCopySecondary}
+              className={`
+                group relative overflow-hidden flex items-center justify-center gap-2 md:gap-3 px-6 md:px-8 py-3.5 md:py-4 transition-colors duration-300 rounded-full
+                ${isCopiedSecondary 
+                  ? 'bg-black/90 text-white border-black/90 shadow-inner' 
+                  : 'bg-transparent text-gray-700 border-gray-300 hover:border-black/50 hover:text-black hover:bg-white/40 hover:shadow-[0_0_20px_rgba(255,255,255,0.4)]'}
+                border backdrop-blur-sm
+              `}
+            >
+              {isCopiedSecondary ? <Check size={16} strokeWidth={0.75} /> : <Copy size={16} strokeWidth={0.75} />}
+              <span className="text-[9px] md:text-xs font-bold uppercase tracking-[0.2em] whitespace-nowrap font-sans">
+                {isCopiedSecondary ? 'Copiado' : `Copiar ${template.secondaryLabel ? 'Protocolo' : 'Secundário'}`}
+              </span>
+            </motion.button>
+          )}
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={handleCopyMain}
             className={`
-              group relative overflow-hidden flex items-center justify-center gap-2 md:gap-3 px-6 md:px-8 py-3.5 transition-all duration-300 flex-1 md:flex-none rounded-full
-              ${isCopiedSecondary ? 'bg-black/90 text-white border-black/90' : 'bg-transparent text-gray-700 border-gray-300 hover:border-black hover:text-black'}
-              border backdrop-blur-sm
+              group relative overflow-hidden flex items-center justify-center gap-2 md:gap-3 px-8 md:px-12 py-3.5 md:py-4 transition-colors duration-300 rounded-full
+              ${isCopiedMain 
+                ? 'bg-black text-white shadow-inner' 
+                : 'bg-white/80 text-black hover:bg-black hover:text-white border-white/50 hover:shadow-[0_0_25px_rgba(255,255,255,0.6)]'}
+              border shadow-sm
             `}
           >
-            {isCopiedSecondary ? <Check size={16} strokeWidth={1.5} /> : <Copy size={16} strokeWidth={1.5} />}
-            <span className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] whitespace-nowrap font-sans">
-              {isCopiedSecondary ? 'Copiado' : `Copiar ${template.secondaryLabel ? 'Protocolo' : 'Secundário'}`}
+            {isCopiedMain ? <Check size={16} strokeWidth={0.75} /> : <Copy size={16} strokeWidth={0.75} />}
+            <span className="text-[9px] md:text-xs font-bold uppercase tracking-[0.2em] whitespace-nowrap font-sans">
+              {isCopiedMain ? 'Copiado' : `Copiar ${template.secondaryContent ? 'Email' : 'Texto'}`}
             </span>
-          </button>
-        )}
-
-        {/* Main Copy Button */}
-        <button
-          onClick={handleCopyMain}
-          className={`
-            group relative overflow-hidden flex items-center justify-center gap-2 md:gap-3 px-8 md:px-10 py-3.5 transition-all duration-300 flex-1 md:flex-none rounded-full
-            ${isCopiedMain ? 'bg-black text-white shadow-lg' : 'bg-white/90 text-black hover:bg-black hover:text-white border-white/50'}
-            border shadow-sm
-          `}
-        >
-          {isCopiedMain ? <Check size={16} strokeWidth={1.5} /> : <Copy size={16} strokeWidth={1.5} />}
-          <span className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] whitespace-nowrap font-sans">
-            {isCopiedMain ? 'Copiado' : `Copiar ${template.secondaryContent ? 'Email' : 'Texto'}`}
-          </span>
-        </button>
-      </div>
+          </motion.button>
+        </div>
+      )}
     </motion.div>
   );
 };
