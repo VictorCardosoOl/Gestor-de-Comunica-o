@@ -10,24 +10,26 @@ interface EditorProps {
   onClose: () => void;
 }
 
-// Staggered children animation
+// Staggered children animation with Physics
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: { 
     opacity: 1,
     transition: { 
-      staggerChildren: 0.05,
+      staggerChildren: 0.08,
       delayChildren: 0.1 
     }
   }
 };
 
+// Items slide up from bottom with a slight scale effect
 const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
+  hidden: { opacity: 0, y: 40, scale: 0.98 },
   visible: { 
     opacity: 1, 
     y: 0, 
-    transition: { type: "spring", stiffness: 120, damping: 20 }
+    scale: 1,
+    transition: { type: "spring", stiffness: 100, damping: 20, mass: 1 }
   }
 };
 
@@ -208,7 +210,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                   {template.channel === CommunicationChannel.EMAIL ? 'Email Template' : (template.channel === 'PROMPT' ? 'AI Prompt' : 'Message')}
                </span>
              </div>
-             {/* FIX: Fluid Typography using Clamp for stable scaling */}
+             {/* Fluid Typography using Clamp for stable scaling */}
              <motion.h1 
                layoutId={`title-${template.id}`}
                className="font-serif italic text-[clamp(1.75rem,2.5vw,3rem)] text-black leading-[0.9] drop-shadow-sm font-light tracking-tight break-words hyphens-auto pr-2"
@@ -411,7 +413,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     style={{ fontFamily: 'Calibri, "Segoe UI", Carlito, sans-serif', fontSize: '12pt', lineHeight: '1.7', color: '#1a1a1a' }}
-                    // FIX: Using REM for min-height consistency
+                    // Using REM for min-height consistency
                     className="w-full h-full min-h-[25rem] md:min-h-[30rem] bg-transparent border-none focus:ring-0 outline-none resize-none placeholder:text-gray-400/30 overflow-hidden"
                     placeholder="Digite o conteúdo principal..."
                     spellCheck={false}
@@ -447,7 +449,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                       value={secondaryContent}
                       onChange={(e) => setSecondaryContent(e.target.value)}
                       style={{ fontFamily: 'Calibri, "Segoe UI", Carlito, sans-serif', fontSize: '12pt', lineHeight: '1.7', color: '#1a1a1a' }}
-                      // FIX: Using REM for min-height consistency
+                      // Using REM for min-height consistency
                       className="w-full h-full min-h-[10rem] bg-transparent border-none focus:ring-0 outline-none resize-none placeholder:text-gray-400/30 overflow-hidden"
                       placeholder="Digite o conteúdo secundário..."
                       spellCheck={false}
