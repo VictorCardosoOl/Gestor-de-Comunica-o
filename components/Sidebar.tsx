@@ -196,6 +196,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 icon={GalleryVerticalEnd}
                 isSelected={selectedCategory === 'all'}
                 isExpanded={isExpanded}
+                isMobile={isMobile}
                 onClick={() => {
                   onSelectCategory('all');
                   if (isMobile) onCloseMobile();
@@ -215,6 +216,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   icon={IconMap[cat.icon] || GalleryVerticalEnd}
                   isSelected={selectedCategory === cat.id}
                   isExpanded={isExpanded}
+                  isMobile={isMobile}
                   onClick={() => {
                     onSelectCategory(cat.id);
                     if (isMobile) onCloseMobile();
@@ -277,13 +279,15 @@ const SidebarItem: React.FC<{
   icon: any;
   isSelected: boolean;
   isExpanded: boolean;
+  isMobile: boolean;
   onClick: () => void;
-}> = ({ label, icon: Icon, isSelected, isExpanded, onClick }) => {
+}> = ({ label, icon: Icon, isSelected, isExpanded, isMobile, onClick }) => {
   const [isHovered, setIsHovered] = useState(false);
 
   return (
     <motion.button
-      layout="position"
+      // CRITICAL FIX: Disable layout projection on mobile to prevent conflict with drawer slide
+      layout={!isMobile ? "position" : undefined} 
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
       onTap={() => setIsHovered(false)}

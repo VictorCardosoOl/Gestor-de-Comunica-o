@@ -10,26 +10,36 @@ interface EditorProps {
   onClose: () => void;
 }
 
-// Staggered children animation with Physics
+// Staggered children animation with "Cinematic" Physics
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: { 
     opacity: 1,
     transition: { 
-      staggerChildren: 0.08,
-      delayChildren: 0.1 
+      staggerChildren: 0.1,
+      delayChildren: 0.15 
     }
+  },
+  exit: {
+    opacity: 0,
+    transition: { duration: 0.2, ease: "easeInOut" }
   }
 };
 
 // Items slide up from bottom with a slight scale effect
 const itemVariants = {
-  hidden: { opacity: 0, y: 40, scale: 0.98 },
+  hidden: { opacity: 0, y: 30, scale: 0.98, filter: 'blur(4px)' },
   visible: { 
     opacity: 1, 
     y: 0, 
     scale: 1,
-    transition: { type: "spring", stiffness: 100, damping: 20, mass: 1 }
+    filter: 'blur(0px)',
+    transition: { 
+      type: "spring", 
+      stiffness: 70, // Softer spring
+      damping: 15,   // More fluid damping
+      mass: 0.8 
+    }
   }
 };
 
@@ -189,12 +199,15 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
+      exit="exit"
       className="h-full flex flex-col bg-transparent overflow-y-auto custom-scrollbar relative lg:rounded-3xl"
     >
       {/* Editorial Header - Fluid Padding */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 border-b border-white/30 relative z-20 bg-gradient-to-b from-white/70 via-white/50 to-white/20 backdrop-blur-2xl shrink-0"
-           style={{ padding: 'clamp(1.5rem, 3vw, 2.5rem)' }}>
-        
+      <motion.div 
+        variants={itemVariants}
+        className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 border-b border-white/30 relative z-20 bg-gradient-to-b from-white/70 via-white/50 to-white/20 backdrop-blur-2xl shrink-0"
+        style={{ padding: 'clamp(1.5rem, 3vw, 2.5rem)' }}
+      >
         <div className="flex items-start md:items-center space-x-4 md:space-x-6">
           <motion.button 
             whileHover={{ scale: 1.1 }}
@@ -279,7 +292,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
             <X size={20} strokeWidth={1.5} />
           </motion.button>
         </div>
-      </div>
+      </motion.div>
 
        <AnimatePresence initial={false}>
         {placeholders.length > 0 && showVariables && (
@@ -323,9 +336,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
       <div className="flex-1" style={{ padding: 'clamp(1rem, 3vw, 3rem)' }}>
         <motion.div 
           className="max-w-4xl mx-auto flex flex-col gap-6 md:gap-12 pb-24 md:pb-20 h-full"
-          initial="hidden"
-          animate="visible"
-          variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
+          variants={{ visible: { transition: { staggerChildren: 0.15 } } }} // More stagger
         >
           {/* --- SCENARIO LIST MODE --- */}
           {isScenarioMode ? (
@@ -417,7 +428,6 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     style={{ fontFamily: 'Calibri, "Segoe UI", Carlito, sans-serif', fontSize: '12pt', lineHeight: '1.7', color: '#1a1a1a' }}
-                    // Changed from min-h-[25rem] to flex-1 to allow dynamic expansion without forcing scroll on small screens
                     className="w-full flex-1 min-h-[200px] bg-transparent border-none focus:ring-0 outline-none resize-none placeholder:text-gray-400/30 overflow-hidden"
                     placeholder="Digite o conteúdo principal..."
                     spellCheck={false}
@@ -468,8 +478,11 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
       </div>
 
       {!isScenarioMode && (
-        <div className="sticky bottom-0 z-30 bg-gradient-to-t from-white/70 via-white/50 to-white/30 backdrop-blur-2xl flex flex-col sm:flex-row sm:justify-end items-stretch sm:items-center gap-3 md:gap-4 border-t border-white/30"
-             style={{ padding: 'clamp(1rem, 2vw, 2rem)' }}>
+        <motion.div 
+          variants={itemVariants}
+          className="sticky bottom-0 z-30 bg-gradient-to-t from-white/70 via-white/50 to-white/30 backdrop-blur-2xl flex flex-col sm:flex-row sm:justify-end items-stretch sm:items-center gap-3 md:gap-4 border-t border-white/30"
+          style={{ padding: 'clamp(1rem, 2vw, 2rem)' }}
+        >
           {template.secondaryContent && (
             <motion.button
               whileHover={{ scale: 1.02 }}
@@ -506,7 +519,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
               {isCopied('main') ? 'Copiado' : `Copiar ${template.secondaryContent ? 'Email' : 'Texto'}`}
             </span>
           </motion.button>
-        </div>
+        </motion.div>
       )}
     </motion.div>
   );
