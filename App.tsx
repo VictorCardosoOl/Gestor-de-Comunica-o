@@ -3,9 +3,32 @@ import { Sidebar } from './components/Sidebar';
 import { Editor } from './components/Editor';
 import { INITIAL_TEMPLATES, CATEGORIES } from './constants';
 import { Template } from './types';
-import { Menu, Search, X } from 'lucide-react';
+import { Menu, Search, X, Loader2, Command, FileText, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { useDebounce } from './hooks/useDebounce';
+import { SmoothWrapper } from './components/SmoothWrapper';
+
+// Helper for highlighting text matches
+const HighlightedText = ({ text, highlight, className }: { text: string, highlight: string, className?: string }) => {
+  if (!highlight.trim()) {
+    return <span className={className}>{text}</span>;
+  }
+  // Safe regex escape
+  const escapedHighlight = highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`(${escapedHighlight})`, 'gi');
+  const parts = text.split(regex);
+  return (
+    <span className={className}>
+      {parts.map((part, i) => 
+        regex.test(part) ? (
+          <span key={i} className="bg-yellow-200/60 text-black font-medium rounded-[2px] px-0.5 box-decoration-clone">{part}</span>
+        ) : (
+          part
+        )
+      )}
+    </span>
+  );
+};
 
 const App: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -13,13 +36,16 @@ const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
+  const isSearching = searchQuery !== debouncedSearchQuery; // Visual feedback for debounce
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  
+  // REFS PARA O SCROLL DO LENIS
+  const listWrapperRef = useRef<HTMLDivElement>(null);
+  const listContentRef = useRef<HTMLDivElement>(null);
 
-  // Initialize isMobile safely based on window presence to avoid hydration mismatch if SSR (though this is likely SPA)
-  // For standard React SPA, window is available.
   const [isMobile, setIsMobile] = useState(() => 
     typeof window !== 'undefined' ? window.innerWidth < 1024 : false
   );
@@ -28,15 +54,36 @@ const App: React.FC = () => {
     const checkMobile = () => {
       const mobile = window.innerWidth < 1024;
       setIsMobile(mobile);
-      if (!mobile) setIsSidebarOpen(false); // Auto-close mobile drawer if resized to desktop
+      if (!mobile) setIsSidebarOpen(false); 
     };
     
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      if (e.key === 'Escape') {
+        if (document.activeElement === searchInputRef.current) {
+           searchInputRef.current?.blur();
+        } else if (selectedTemplate) {
+           setSelectedTemplate(null);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedTemplate]);
+
+  // Robust Search Logic
   const filteredTemplates = useMemo(() => {
     let filtered = INITIAL_TEMPLATES || [];
+    
     const normalize = (str: string) => 
       str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "";
 
@@ -72,23 +119,23 @@ const App: React.FC = () => {
       : CATEGORIES.find(c => c.id === selectedCategory)?.name || 'Módulo');
 
   const editorPanelVariants = {
-    initial: { opacity: 0, x: 30, scale: 0.98 },
+    initial: { opacity: 0, x: 40, scale: 0.98 },
     animate: { 
       opacity: 1, x: 0, scale: 1,
-      transition: { type: "spring", stiffness: 300, damping: 30, mass: 0.8 }
+      transition: { type: "spring", stiffness: 200, damping: 30, mass: 1 }
     },
-    exit: { opacity: 0, x: 20, transition: { duration: 0.2 } }
+    exit: { opacity: 0, x: 20, transition: { duration: 0.3, ease: "easeInOut" } }
   };
 
   const mobileEditorVariants = {
     initial: { y: '100%' },
     animate: { 
       y: 0,
-      transition: { type: "spring", damping: 30, stiffness: 300 }
+      transition: { type: "spring", damping: 35, stiffness: 250 }
     },
     exit: { 
       y: '100%',
-      transition: { type: "spring", damping: 30, stiffness: 300 }
+      transition: { type: "spring", damping: 35, stiffness: 250 }
     }
   };
 
@@ -116,7 +163,7 @@ const App: React.FC = () => {
               onClick={() => setIsSidebarOpen(true)} 
               className="p-2 -ml-2 text-black active:scale-95 transition-transform rounded-full hover:bg-black/5"
             >
-              <Menu size={24} strokeWidth={1} />
+              <Menu size={20} strokeWidth={0.75} />
             </button>
             <span className="font-serif italic text-xl font-medium tracking-tight text-black">QuickComms</span>
             <div className="w-8" />
@@ -130,38 +177,39 @@ const App: React.FC = () => {
               layout 
               className={`
                 flex flex-col shrink-0 relative z-20 
-                w-full 
+                w-full h-full
                 ${selectedTemplate 
                   ? 'lg:flex-[0_0_24rem] xl:flex-[0_0_28rem] lg:max-w-[30vw]' 
                   : 'lg:w-full'}
                 
-                bg-gradient-to-b from-white/80 via-white/50 to-white/30
-                backdrop-blur-2xl
-                lg:border border-white/40
-                lg:shadow-sm
+                /* LIQUID GLASS REFINEMENT */
+                bg-gradient-to-b from-white/40 to-white/5
+                backdrop-blur-3xl
+                lg:border border-white/20
+                lg:shadow-[0_8px_32px_0_rgba(0,0,0,0.02)]
                 lg:rounded-3xl
+                overflow-hidden
               `}
-              transition={{ type: "spring", stiffness: 300, damping: 30, mass: 1 }}
+              transition={{ type: "spring", stiffness: 200, damping: 30, mass: 1.2 }}
             >
-               <div className="absolute inset-0 opacity-[0.02] pointer-events-none mix-blend-multiply rounded-3xl" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }}></div>
+               <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay rounded-3xl" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }}></div>
 
               {/* Header Title */}
               <div className="px-6 pt-8 pb-4 shrink-0 z-10">
                 <motion.div
                   layout="position"
                   key={currentCategoryName}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
+                  initial={{ opacity: 0, y: 10, filter: 'blur(5px)' }}
+                  animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                  transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                 >
                   <div className="flex flex-col gap-1">
-                    <span className="text-[10px] font-sans font-bold uppercase tracking-[0.25em] text-gray-500 pl-1">
+                    <span className="text-editorial-label text-gray-500 pl-1">
                       {debouncedSearchQuery ? 'Pesquisa' : 'Categoria'}
                     </span>
                     <motion.h2 
                       layout="position" 
-                      className="font-serif italic font-light text-black tracking-tight truncate pr-2"
-                      style={{ fontSize: 'clamp(1.8rem, 2.5vw, 2.5rem)' }}
+                      className="text-editorial-title text-black tracking-tight truncate pr-2"
                     >
                       {currentCategoryName}
                     </motion.h2>
@@ -169,117 +217,196 @@ const App: React.FC = () => {
                 </motion.div>
               </div>
 
-              {/* Search Bar */}
-              <div className="px-6 pb-4 shrink-0 z-20">
-                <div 
+              {/* Enhanced Search Bar */}
+              <div className="px-6 pb-6 shrink-0 z-20">
+                <motion.div 
+                  layout
                   className={`
-                    relative group flex items-center w-full rounded-xl transition-all duration-300
+                    relative group flex items-center w-full rounded-2xl transition-all duration-300 ease-out overflow-hidden
                     ${isSearchFocused 
-                      ? 'bg-white shadow-sm ring-1 ring-black/5' 
-                      : 'bg-white/40 border border-white/40 hover:bg-white/60'}
+                      ? 'bg-white/90 backdrop-blur-xl shadow-[0_8px_40px_-10px_rgba(0,0,0,0.15)] ring-1 ring-black/10 scale-[1.01]' 
+                      : 'bg-white/40 backdrop-blur-md border border-white/40 hover:bg-white/60 hover:border-white/50 shadow-sm'}
                   `}
                 >
-                  <div className={`pl-3.5 transition-colors duration-300 ${isSearchFocused ? 'text-black' : 'text-gray-400'}`}>
-                    <Search size={16} strokeWidth={1.5} />
+                  <div className={`pl-4 transition-colors duration-300 ${isSearchFocused ? 'text-black' : 'text-gray-400'}`}>
+                    {isSearching ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <Search size={16} strokeWidth={0.75} />
+                    )}
                   </div>
                   <input 
                     ref={searchInputRef}
                     type="text"
-                    placeholder="Buscar modelos..."
+                    placeholder="Buscar (⌘K)"
                     value={searchQuery}
                     onFocus={() => setIsSearchFocused(true)}
                     onBlur={() => setIsSearchFocused(false)}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-3 pr-10 py-3 bg-transparent border-none focus:ring-0 outline-none text-[#111] placeholder:text-gray-500/60 text-sm font-sans"
+                    className="w-full pl-3 pr-10 py-3.5 bg-transparent border-none focus:ring-0 outline-none text-[#111] placeholder:text-gray-500/50 text-sm font-sans tracking-wide"
                   />
                   <div className="absolute right-3 flex items-center gap-2">
-                     {searchQuery && (
-                       <button 
-                         onClick={() => {
-                           setSearchQuery('');
-                           searchInputRef.current?.focus();
-                         }}
-                         className="p-1 rounded-full bg-gray-200/50 hover:bg-gray-300 text-gray-600 transition-colors"
-                       >
-                         <X size={12} strokeWidth={2} />
-                       </button>
-                     )}
+                     <AnimatePresence>
+                       {searchQuery ? (
+                         <motion.button 
+                           initial={{ opacity: 0, scale: 0.8, rotate: -45 }}
+                           animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                           exit={{ opacity: 0, scale: 0.8, rotate: 45 }}
+                           whileHover={{ scale: 1.1 }}
+                           whileTap={{ scale: 0.9 }}
+                           onClick={() => {
+                             setSearchQuery('');
+                             searchInputRef.current?.focus();
+                           }}
+                           className="p-1.5 rounded-full bg-black/5 hover:bg-black hover:text-white text-gray-500 transition-colors"
+                         >
+                           <X size={10} strokeWidth={1.5} />
+                         </motion.button>
+                       ) : (
+                         !isMobile && !isSearchFocused && (
+                           <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="pointer-events-none px-1.5 py-0.5 rounded border border-black/5 bg-black/5 text-[10px] font-sans text-black/30 font-medium"
+                           >
+                             ⌘K
+                           </motion.div>
+                         )
+                       )}
+                     </AnimatePresence>
                   </div>
-                </div>
+                </motion.div>
               </div>
 
               {/* Template List */}
-              <div className="flex-1 overflow-y-auto custom-scrollbar px-3 pb-6 z-10">
-                <div className="flex flex-col gap-2">
-                  <LayoutGroup id="template-list">
-                    {filteredTemplates.length === 0 ? (
-                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-12 text-center px-6">
-                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-white/60 to-white/20 border border-white/50 flex items-center justify-center mb-4 backdrop-blur-sm shadow-sm">
-                          <Search size={24} strokeWidth={1} className="text-black/30" />
-                        </div>
-                        <p className="font-serif italic text-xl text-black/60 mb-2">Nada encontrado</p>
-                        <p className="text-xs text-gray-400 max-w-[200px] leading-relaxed">
-                          Não encontramos modelos para "{debouncedSearchQuery}". Tente outra palavra-chave.
-                        </p>
-                      </motion.div>
-                    ) : (
-                      filteredTemplates.map((template, index) => (
-                        <motion.button
-                          layout="position"
-                          key={template.id}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          whileHover={{ scale: 1.01, backgroundColor: 'rgba(255,255,255,0.6)' }}
-                          whileTap={{ scale: 0.98 }}
-                          transition={{ 
-                            delay: index * 0.04, 
-                            type: "spring", stiffness: 300, damping: 25 
-                          }}
-                          onClick={() => setSelectedTemplate(template)}
-                          className={`
-                            w-full text-left p-4 rounded-xl transition-colors duration-200 group relative
-                            ${selectedTemplate?.id === template.id 
-                              ? 'bg-white shadow-[0_4px_12px_-2px_rgba(0,0,0,0.06)] border border-white/60 ring-1 ring-black/5' 
-                              : 'border border-transparent hover:border-white/30'}
-                          `}
+              <div 
+                className="flex-1 overflow-y-auto custom-scrollbar relative z-10" 
+                ref={listWrapperRef}
+              >
+                <SmoothWrapper 
+                  className="min-h-full px-3 pb-6" 
+                  wrapperRef={listWrapperRef} 
+                  contentRef={listContentRef}
+                  resetDependency={[selectedCategory, debouncedSearchQuery]} 
+                >
+                  <div 
+                    ref={listContentRef}
+                    className="flex flex-col gap-2.5"
+                  >
+                    <LayoutGroup id="template-list">
+                      <AnimatePresence mode="popLayout">
+                      {filteredTemplates.length === 0 ? (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 10 }} 
+                          animate={{ opacity: 1, y: 0 }} 
+                          exit={{ opacity: 0 }}
+                          className="flex flex-col items-center justify-center py-20 text-center px-6"
                         >
-                          <div className="flex justify-between items-start mb-2">
-                            <span className={`
-                              text-[9px] font-bold uppercase tracking-[0.1em] font-sans px-2 py-0.5 rounded-md border
-                              ${selectedTemplate?.id === template.id 
-                                ? 'bg-black text-white border-black' 
-                                : 'bg-white/50 text-gray-500 border-gray-100 group-hover:border-gray-300'}
-                              transition-colors duration-200
-                            `}>
-                               {template.channel === 'EMAIL' ? 'Email' : (template.channel === 'PROMPT' ? 'Prompt' : 'Chat')}
-                            </span>
-                            {selectedTemplate?.id === template.id && (
-                               <motion.div layoutId="activeDot" className="w-1.5 h-1.5 rounded-full bg-black" />
-                            )}
+                          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-white/80 to-white/20 border border-white/50 flex items-center justify-center mb-6 shadow-lg shadow-black/5 backdrop-blur-md">
+                            <Search size={24} strokeWidth={0.5} className="text-black/40" />
                           </div>
-                          
-                          <h3 className={`
-                            font-serif text-xl italic leading-tight mb-1 transition-colors
-                            ${selectedTemplate?.id === template.id ? 'text-black' : 'text-gray-800 group-hover:text-black'}
-                          `}>
-                            {template.title}
-                          </h3>
-                          <p className={`
-                            text-[11px] font-sans leading-relaxed line-clamp-2
-                            ${selectedTemplate?.id === template.id ? 'text-gray-600' : 'text-gray-400 group-hover:text-gray-500'}
-                          `}>
-                            {template.description}
+                          <p className="font-serif italic text-2xl text-black/80 mb-2">Sem resultados</p>
+                          <p className="text-[11px] text-gray-500 max-w-[200px] leading-relaxed font-light mb-6">
+                            Não encontramos nenhum modelo correspondente a "{debouncedSearchQuery}".
                           </p>
-                        </motion.button>
-                      ))
-                    )}
-                  </LayoutGroup>
-                </div>
+                           <motion.button
+                             whileHover={{ scale: 1.05 }}
+                             whileTap={{ scale: 0.95 }}
+                             onClick={() => {
+                               setSearchQuery('');
+                               searchInputRef.current?.focus();
+                             }}
+                             className="px-6 py-2.5 bg-white/60 border border-white/40 rounded-full text-editorial-label text-black/80 hover:text-black hover:bg-white hover:shadow-md transition-all duration-300"
+                           >
+                             Limpar Busca
+                           </motion.button>
+                        </motion.div>
+                      ) : (
+                        filteredTemplates.map((template, index) => {
+                          const normalize = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                          const q = normalize(debouncedSearchQuery);
+                          const titleMatch = normalize(template.title).includes(q);
+                          const descMatch = normalize(template.description || '').includes(q);
+                          const isDeepMatch = debouncedSearchQuery && !titleMatch && !descMatch;
+
+                          return (
+                          <motion.button
+                            layout="position"
+                            key={template.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            whileHover={{ scale: 1.01, backgroundColor: 'rgba(255,255,255,0.6)' }}
+                            whileTap={{ scale: 0.98 }}
+                            transition={{ 
+                              delay: index * 0.03, 
+                              type: "spring", stiffness: 100, damping: 20 
+                            }}
+                            onClick={() => setSelectedTemplate(template)}
+                            className={`
+                              w-full text-left p-5 rounded-2xl transition-all duration-300 group relative
+                              ${selectedTemplate?.id === template.id 
+                                ? 'bg-white shadow-[0_8px_30px_-5px_rgba(0,0,0,0.04)] border border-white/60' 
+                                : 'border border-transparent hover:border-white/30'}
+                            `}
+                          >
+                            <div className="flex justify-between items-start mb-2.5">
+                              <div className="flex flex-wrap gap-1.5">
+                                <span className={`
+                                  text-editorial-label px-2 py-0.5 rounded border text-[9px] tracking-[0.1em]
+                                  ${selectedTemplate?.id === template.id 
+                                    ? 'bg-black text-white border-black' 
+                                    : 'bg-white/30 text-gray-400 border-white/20 group-hover:border-black/10 group-hover:text-gray-600'}
+                                  transition-colors duration-300
+                                `}>
+                                   {template.channel === 'EMAIL' ? 'Email' : (template.channel === 'PROMPT' ? 'Prompt' : 'Chat')}
+                                </span>
+                                {template.secondaryContent && (
+                                  <span className="text-editorial-label px-2 py-0.5 rounded border border-white/20 bg-blue-50/50 text-blue-800/70 text-[9px] tracking-[0.1em]">
+                                    + Protocolo
+                                  </span>
+                                )}
+                              </div>
+                              {selectedTemplate?.id === template.id && (
+                                 <motion.div layoutId="activeDot" className="w-1.5 h-1.5 rounded-full bg-black mt-1" />
+                              )}
+                            </div>
+                            
+                            <h3 className={`
+                              font-serif text-xl italic leading-none mb-2 transition-colors
+                              ${selectedTemplate?.id === template.id ? 'text-black font-medium' : 'text-gray-800 font-light group-hover:text-black'}
+                            `}>
+                              <HighlightedText text={template.title} highlight={debouncedSearchQuery} />
+                            </h3>
+                            <p className={`
+                              text-[11px] font-sans leading-relaxed line-clamp-2 tracking-wide
+                              ${selectedTemplate?.id === template.id ? 'text-gray-600' : 'text-gray-400 group-hover:text-gray-500'}
+                            `}>
+                              <HighlightedText text={template.description || ''} highlight={debouncedSearchQuery} />
+                            </p>
+
+                            {isDeepMatch && (
+                              <div className="mt-2 flex items-center gap-1.5">
+                                <FileText size={10} className="text-gray-400" />
+                                <span className="text-[9px] text-gray-400 font-medium bg-white/40 px-1.5 rounded-sm">
+                                  Encontrado no conteúdo
+                                </span>
+                              </div>
+                            )}
+                          </motion.button>
+                        );
+                        })}
+                      )}
+                      </AnimatePresence>
+                    </LayoutGroup>
+                  </div>
+                </SmoothWrapper>
               </div>
               
-              <div className="px-6 py-3 border-t border-white/20 bg-white/10 backdrop-blur-md flex justify-between items-center z-10">
-                 <span className="text-[10px] text-gray-400 font-medium">
-                    {filteredTemplates.length} {filteredTemplates.length === 1 ? 'modelo' : 'modelos'}
+              <div className="px-6 py-4 border-t border-white/10 bg-white/5 backdrop-blur-md flex justify-between items-center z-10 rounded-b-3xl">
+                 <span className="text-editorial-label text-gray-400">
+                    {filteredTemplates.length} {filteredTemplates.length === 1 ? 'item' : 'itens'}
                  </span>
                  {debouncedSearchQuery && (
                    <span className="text-[10px] text-gray-400 italic">
@@ -315,20 +442,20 @@ const App: React.FC = () => {
                 !isMobile && (
                   <motion.div 
                     key="empty-state"
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
+                    initial={{ opacity: 0, scale: 0.98, filter: "blur(5px)" }}
+                    animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.4 }}
+                    transition={{ duration: 0.8, ease: "circOut" }}
                     className="hidden lg:flex flex-1 h-full flex-col items-center justify-center text-gray-300 select-none pointer-events-none p-4 text-center"
                   >
-                    <div className="w-px h-16 md:h-24 bg-gradient-to-b from-transparent via-black/5 to-transparent mb-6"></div>
-                    <h3 className="text-4xl md:text-5xl font-serif italic text-black/10 mb-3 tracking-wide">Studio</h3>
-                    <div className="flex items-center gap-3">
-                      <span className="h-px w-8 bg-black/5"></span>
-                      <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-black/30 font-medium">
+                    <div className="w-px h-24 bg-gradient-to-b from-transparent via-black/5 to-transparent mb-8"></div>
+                    <h3 className="text-5xl font-serif italic text-black/5 mb-4 tracking-wide mix-blend-multiply">Studio</h3>
+                    <div className="flex items-center gap-4 opacity-50">
+                      <span className="h-px w-8 bg-black/10"></span>
+                      <p className="text-editorial-label text-black/30">
                         Selecione um modelo
                       </p>
-                      <span className="h-px w-8 bg-black/5"></span>
+                      <span className="h-px w-8 bg-black/10"></span>
                     </div>
                   </motion.div>
                 )

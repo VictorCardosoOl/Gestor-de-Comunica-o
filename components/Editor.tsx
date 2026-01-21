@@ -1,47 +1,16 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+
+import React, { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
 import { Template, CommunicationChannel } from '../types';
 import { Copy, RefreshCw, Check, MoveLeft, Sparkles, SlidersHorizontal, Loader2, Quote, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { refineText } from '../services/geminiService';
 import { useTemplateCopier } from '../hooks/useTemplateCopier';
+import { MagneticButton } from './MagneticButton';
+import gsap from 'gsap';
 
 interface EditorProps {
   template: Template;
   onClose: () => void;
 }
-
-// Staggered children animation with "Cinematic" Physics
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: { 
-    opacity: 1,
-    transition: { 
-      staggerChildren: 0.1,
-      delayChildren: 0.15 
-    }
-  },
-  exit: {
-    opacity: 0,
-    transition: { duration: 0.2, ease: "easeInOut" }
-  }
-};
-
-// Items slide up from bottom with a slight scale effect
-const itemVariants = {
-  hidden: { opacity: 0, y: 30, scale: 0.98, filter: 'blur(4px)' },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
-    scale: 1,
-    filter: 'blur(0px)',
-    transition: { 
-      type: "spring", 
-      stiffness: 70, // Softer spring
-      damping: 15,   // More fluid damping
-      mass: 0.8 
-    }
-  }
-};
 
 interface Scenario {
   title: string;
@@ -56,18 +25,14 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
   const [showVariables, setShowVariables] = useState(true);
   
   const [isRefining, setIsRefining] = useState(false);
-
-  // Use Custom Hook for Copy Logic
   const { copyToClipboard, isCopied } = useTemplateCopier();
-
-  // Refs for auto-resizing textareas
   const mainTextareaRef = useRef<HTMLTextAreaElement>(null);
   const secondaryTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // --- SCENARIO LOGIC ---
   const isScenarioMode = useMemo(() => template.content.includes('[CENÁRIO:'), [template]);
 
-  // --- HELPER FUNCTIONS ---
+  // --- LOGIC ---
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour >= 5 && hour < 12) return 'Bom dia';
@@ -102,13 +67,11 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
 
   useEffect(() => {
     setSubject(template.subject || '');
-    // Process content to apply automated variables like [Saudação] immediately
     setContent(processTemplate(template.content)); 
     setSecondaryContent(processTemplate(template.secondaryContent || ''));
     setVariableValues({});
   }, [template, processTemplate]);
 
-  // Auto-resize textareas when content changes or template loads
   const adjustTextareaHeight = (element: HTMLTextAreaElement | null) => {
     if (element) {
       element.style.height = 'auto';
@@ -117,7 +80,6 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
   };
 
   useEffect(() => {
-    // Small timeout to ensure render is complete
     const timer = setTimeout(() => {
       adjustTextareaHeight(mainTextareaRef.current);
       adjustTextareaHeight(secondaryTextareaRef.current);
@@ -125,26 +87,20 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
     return () => clearTimeout(timer);
   }, [content, secondaryContent, isScenarioMode, template.id]);
 
-  // Recalculate scenarios based on the processed content
   const scenarios: Scenario[] = useMemo(() => {
     if (!isScenarioMode) return [];
-    // Split by bracket but preserve content logic
     const rawSegments = content.split('[').filter(s => s.trim().length > 0);
     
     return rawSegments.map(seg => {
       if (!seg.startsWith('CENÁRIO:')) return null;
-      
       const closingBracketIndex = seg.indexOf(']');
       if (closingBracketIndex === -1) return null;
-
-      const title = seg.substring(8, closingBracketIndex).trim(); // Remove 'CENÁRIO: '
+      const title = seg.substring(8, closingBracketIndex).trim(); 
       const text = seg.substring(closingBracketIndex + 1).trim();
-      
       return { title, text };
     }).filter((item): item is Scenario => item !== null);
   }, [content, isScenarioMode]);
 
-  // Sync Logic (Filtered to ignore Scenarios)
   const placeholders = useMemo(() => {
     const regex = /\[(.*?)\]/g;
     const allText = `${template.subject || ''} ${template.content} ${template.secondaryContent || ''} ${template.tertiaryContent || ''}`;
@@ -155,7 +111,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
       !p.includes('Saudação') && 
       !p.includes('Data Hoje') && 
       !p.includes('Data Extenso') &&
-      !p.includes('CENÁRIO') // CRITICAL: Ignore scenario tags
+      !p.includes('CENÁRIO') 
     );
   }, [template]);
 
@@ -164,7 +120,6 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
     const newValue = inputValue === '' ? placeholder : inputValue;
     setVariableValues(prev => ({ ...prev, [placeholder]: newValue }));
     
-    // Only replace in text, do not update 'content' state directly if in scenario mode to avoid breaking parser
     const replaceInText = (text: string) => text.split(oldValue).join(newValue);
     setSubject(prev => replaceInText(prev));
     setContent(prev => replaceInText(prev));
@@ -174,7 +129,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
   const handleReset = () => {
     if (window.confirm('Restaurar texto original?')) {
       setSubject(template.subject || '');
-      setContent(processTemplate(template.content)); // Reset to processed
+      setContent(processTemplate(template.content)); 
       setSecondaryContent(processTemplate(template.secondaryContent || ''));
       setVariableValues({});
     }
@@ -194,120 +149,135 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
     }
   };
 
+  // --- MOTION SYSTEM (GSAP) ---
+  useLayoutEffect(() => {
+    const ctx = gsap.context(() => {
+      // 1. Title Reveal (Character stagger)
+      const tl = gsap.timeline();
+      
+      tl.from(".char-reveal", {
+        yPercent: 120,
+        opacity: 0,
+        rotationZ: 5,
+        stagger: 0.02,
+        duration: 1,
+        ease: "power4.out"
+      });
+
+      // 2. Elements Entry (Inertia Stagger)
+      tl.from(".animate-entry", {
+        y: 60,
+        opacity: 0,
+        duration: 1.2,
+        stagger: 0.1,
+        ease: "power3.out",
+        clearProps: "all"
+      }, "-=0.8");
+
+    }, containerRef);
+
+    return () => ctx.revert();
+  }, [template.id]);
+
+  // Helper for text splitting
+  const splitText = (text: string) => {
+    return text.split("").map((char, i) => (
+      <span key={i} className="inline-block overflow-hidden align-top">
+        <span className="char-reveal inline-block">
+          {char === " " ? "\u00A0" : char}
+        </span>
+      </span>
+    ));
+  };
+
   return (
-    <motion.div 
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      exit="exit"
+    <div 
+      ref={containerRef}
       className="h-full flex flex-col bg-transparent relative lg:rounded-3xl overflow-hidden"
     >
-      {/* Editorial Header - Fixed */}
-      <motion.div 
-        variants={itemVariants}
-        className="flex-none flex flex-col xl:flex-row xl:items-center justify-between gap-6 border-b border-white/30 relative z-20 bg-gradient-to-b from-white/70 via-white/50 to-white/20 backdrop-blur-2xl shrink-0"
+      {/* Editorial Header with Sticky Blur */}
+      <div 
+        className="flex-none flex flex-col xl:flex-row xl:items-center justify-between gap-6 border-b border-white/20 relative z-20 bg-gradient-to-b from-white/60 via-white/40 to-white/10 backdrop-blur-2xl shrink-0"
         style={{ padding: 'clamp(1.5rem, 3vw, 2.5rem)' }}
       >
         <div className="flex items-start md:items-center space-x-4 md:space-x-6">
-          <motion.button 
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+          <button 
             onClick={onClose}
             className="lg:hidden group flex items-center gap-2 text-black hover:opacity-50 transition-opacity mt-1 md:mt-0"
           >
-            <MoveLeft size={24} strokeWidth={0.75} />
-          </motion.button>
+            <MoveLeft size={20} strokeWidth={0.75} />
+          </button>
           
           <div className="flex flex-col gap-2 min-w-0">
-             <div className="flex items-center gap-3">
-               <span className="w-1.5 h-1.5 bg-black/80 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.2)]"></span>
-               <span className="text-[9px] font-sans font-bold uppercase tracking-[0.25em] text-black/60">
-                  {template.channel === CommunicationChannel.EMAIL ? 'Email Template' : (template.channel === 'PROMPT' ? 'AI Prompt' : 'Message')}
+             <div className="flex items-center gap-3 animate-entry">
+               <span className="w-1.5 h-1.5 bg-black rounded-full shadow-[0_0_10px_rgba(0,0,0,0.2)]"></span>
+               <span className="text-editorial-label text-black/40">
+                  {template.channel === CommunicationChannel.EMAIL ? 'Email' : (template.channel === 'PROMPT' ? 'Prompt' : 'Chat')}
                </span>
              </div>
-             <motion.h1 
-               layoutId={`title-${template.id}`}
-               className="font-serif italic text-black leading-[0.9] drop-shadow-sm font-light tracking-tight break-words hyphens-auto pr-2"
-               style={{ fontSize: 'clamp(1.75rem, 4vw, 3rem)' }}
-             >
-               {template.title}
-             </motion.h1>
+             <h1 className="text-editorial-title text-black leading-none drop-shadow-sm break-words hyphens-auto pr-2">
+               {splitText(template.title)}
+             </h1>
           </div>
         </div>
         
-        <div className="flex flex-wrap items-center gap-2 md:gap-3 self-start md:self-auto pt-2 xl:pt-0">
+        <div className="flex flex-wrap items-center gap-2 md:gap-3 self-start md:self-auto pt-2 xl:pt-0 animate-entry">
           {!isScenarioMode && (
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+            <MagneticButton
               onClick={handleAiRefine}
-              disabled={isRefining}
               className={`
                 flex items-center gap-2 px-4 py-2 md:px-5 md:py-2.5 rounded-full transition-colors duration-300
                 ${isRefining 
                   ? 'bg-white/50 text-black/40 cursor-wait' 
-                  : 'bg-white/40 hover:bg-white/80 border border-white/40 shadow-sm hover:shadow-md text-gray-800'}
+                  : 'bg-white/30 hover:bg-white/60 border border-white/30 shadow-sm hover:shadow-md text-gray-800'}
               `}
             >
-              {isRefining ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} strokeWidth={0.75} className="text-gray-600" />}
-              <span className="text-[9px] font-bold uppercase tracking-[0.2em] font-sans">
+              {isRefining ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} strokeWidth={0.75} className="text-gray-600" />}
+              <span className="text-editorial-label font-sans">
                 {isRefining ? 'Processando' : 'Otimizar'}
               </span>
-            </motion.button>
+            </MagneticButton>
           )}
 
-          <div className="hidden sm:block w-px h-6 bg-black/10 mx-1"></div>
+          <div className="hidden sm:block w-px h-6 bg-black/5 mx-1"></div>
 
           {placeholders.length > 0 && (
-             <motion.button 
-              whileHover={{ scale: 1.1, rotate: 90 }}
-              whileTap={{ scale: 0.9 }}
-              transition={{ type: "spring", stiffness: 200, damping: 10 }}
+             <MagneticButton 
               onClick={() => setShowVariables(!showVariables)}
-              className={`p-2.5 md:p-3 rounded-full transition-colors duration-300 backdrop-blur-sm border border-transparent ${showVariables ? 'bg-white/70 text-black shadow-md border-white/40' : 'text-gray-500 hover:text-black hover:bg-white/40'}`}
+              className={`p-2.5 md:p-3 rounded-full transition-colors duration-300 backdrop-blur-sm border border-transparent ${showVariables ? 'bg-white/60 text-black shadow-md border-white/30' : 'text-gray-500 hover:text-black hover:bg-white/30'}`}
               title="Alternar Variáveis"
             >
-              <SlidersHorizontal size={18} strokeWidth={0.75} />
-            </motion.button>
+              <SlidersHorizontal size={16} strokeWidth={0.75} />
+            </MagneticButton>
           )}
-          <motion.button 
-            whileHover={{ rotate: 180 }}
-            whileTap={{ scale: 0.9 }}
-            transition={{ type: "spring", stiffness: 200, damping: 15 }}
+          <MagneticButton 
             onClick={handleReset}
-            className="text-gray-500 hover:text-black transition-colors p-2.5 md:p-3 hover:bg-white/40 rounded-full"
+            className="text-gray-500 hover:text-black transition-colors p-2.5 md:p-3 hover:bg-white/30 rounded-full"
             title="Resetar"
           >
-            <RefreshCw size={18} strokeWidth={0.75} />
-          </motion.button>
+            <RefreshCw size={16} strokeWidth={0.75} />
+          </MagneticButton>
           
-          <motion.button
-            whileHover={{ scale: 1.1, rotate: 90 }}
-            whileTap={{ scale: 0.9 }}
+          <MagneticButton
             onClick={onClose}
-            className="hidden lg:flex p-2.5 md:p-3 rounded-full text-gray-400 hover:text-black hover:bg-white/40 transition-colors"
+            className="hidden lg:flex p-2.5 md:p-3 rounded-full text-gray-400 hover:text-black hover:bg-white/30 transition-colors"
             title="Fechar"
           >
-            <X size={20} strokeWidth={1.5} />
-          </motion.button>
+            <X size={18} strokeWidth={1} />
+          </MagneticButton>
         </div>
-      </motion.div>
+      </div>
 
        {/* Scrollable Content Area */}
        <div className="flex-1 overflow-y-auto custom-scrollbar relative">
-         <AnimatePresence initial={false}>
-          {placeholders.length > 0 && showVariables && (
-            <motion.div 
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="bg-white/30 backdrop-blur-2xl border-b border-white/30 shrink-0 relative z-20 overflow-hidden shadow-sm origin-top"
+         {placeholders.length > 0 && showVariables && (
+            <div 
+              className="bg-white/20 backdrop-blur-xl border-b border-white/20 shrink-0 relative z-20 overflow-hidden shadow-sm animate-entry"
             >
               <div className="px-6 md:px-12 py-8 md:py-10">
-                <div className="flex items-center gap-2 mb-6 md:mb-8 text-black/70">
-                  <Sparkles size={14} strokeWidth={1} />
-                  <span className="text-[9px] font-bold uppercase tracking-[0.25em] font-sans">Preenchimento Automático</span>
+                <div className="flex items-center gap-2 mb-6 md:mb-8 text-black/60">
+                  <Sparkles size={12} strokeWidth={0.75} />
+                  <span className="text-editorial-label font-sans">Preenchimento Automático</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-12 gap-y-8 md:gap-y-10">
                   {placeholders.map((placeholder) => (
@@ -322,7 +292,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                       />
                       <label 
                         htmlFor={placeholder}
-                        className="absolute left-0 -top-4 text-[9px] font-sans font-bold uppercase tracking-[0.2em] text-gray-400 transition-all peer-placeholder-shown:text-xs peer-placeholder-shown:top-2.5 peer-placeholder-shown:text-gray-400/70 peer-focus:-top-4 peer-focus:text-[9px] peer-focus:text-black cursor-text"
+                        className="absolute left-0 -top-4 text-editorial-label text-gray-400 transition-all peer-placeholder-shown:text-xs peer-placeholder-shown:top-2.5 peer-placeholder-shown:text-gray-400/70 peer-focus:-top-4 peer-focus:text-[9px] peer-focus:text-black cursor-text"
                       >
                         {placeholder.replace('[', '').replace(']', '')}
                       </label>
@@ -330,71 +300,65 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                   ))}
                 </div>
               </div>
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
 
         <div className="w-full" style={{ padding: 'clamp(1rem, 3vw, 3rem)' }}>
-          <motion.div 
-            className="max-w-4xl mx-auto flex flex-col gap-6 md:gap-12 pb-12"
-            variants={{ visible: { transition: { staggerChildren: 0.15 } } }} 
-          >
+          <div className="max-w-4xl mx-auto flex flex-col gap-6 md:gap-12 pb-12">
             {/* --- SCENARIO LIST MODE --- */}
             {isScenarioMode ? (
               <div className="grid grid-cols-1 gap-6">
                   {scenarios.map((scene, idx) => (
-                    <motion.div 
+                    <div 
                       key={idx}
-                      variants={itemVariants}
                       className="
+                        animate-entry
                         relative p-6 md:p-8
-                        bg-gradient-to-br from-white/70 via-white/50 to-white/30
-                        backdrop-blur-3xl border border-white/50 
-                        shadow-[0_10px_30px_-10px_rgba(0,0,0,0.05)]
+                        bg-gradient-to-br from-white/60 via-white/40 to-white/20
+                        backdrop-blur-3xl border border-white/40 
+                        shadow-[0_10px_30px_-10px_rgba(0,0,0,0.03)]
                         rounded-2xl
                         flex flex-col gap-4
                       "
                     >
                       <div className="flex justify-between items-center border-b border-black/5 pb-3">
                         <div className="flex items-center gap-2">
-                          <Quote size={14} className="text-black/40" />
-                          <h3 className="text-xs font-bold uppercase tracking-widest text-black/70">
+                          <Quote size={12} className="text-black/30" />
+                          <h3 className="text-editorial-label text-black/60">
                             {scene.title}
                           </h3>
                         </div>
-                        <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
+                        <MagneticButton
                             onClick={() => copyToClipboard(scene.text, `scenario-${idx}`)}
                             className={`
-                              px-4 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-widest border transition-all
+                              px-4 py-1.5 rounded-full text-editorial-label border transition-all
                               ${isCopied(`scenario-${idx}`)
                                 ? 'bg-black text-white border-black' 
-                                : 'bg-white/50 text-gray-600 border-gray-300 hover:border-black hover:text-black'}
+                                : 'bg-white/40 text-gray-600 border-gray-300 hover:border-black hover:text-black'}
                             `}
                         >
                           {isCopied(`scenario-${idx}`) ? 'Copiado' : 'Copiar'}
-                        </motion.button>
+                        </MagneticButton>
                       </div>
-                      <div className="font-sans text-base leading-relaxed text-[#1a1a1a] whitespace-pre-wrap">
+                      <div className="font-sans text-editorial-body text-[#1a1a1a] whitespace-pre-wrap">
                         {scene.text}
                       </div>
-                    </motion.div>
+                    </div>
                   ))}
               </div>
             ) : (
               /* --- STANDARD EDITOR MODE --- */
               <>
-                <motion.div 
-                  variants={itemVariants}
+                <div 
                   className="
+                  animate-entry
                   relative flex flex-col w-full
                   min-h-[30vh]
                   p-6 md:p-14
-                  bg-gradient-to-br from-white/70 via-white/50 to-white/30
+                  bg-gradient-to-br from-white/60 via-white/40 to-white/20
                   backdrop-blur-3xl
-                  border border-white/50 
-                  shadow-[0_20px_40px_-10px_rgba(0,0,0,0.05)]
+                  border border-white/40 
+                  shadow-[0_20px_40px_-10px_rgba(0,0,0,0.03)]
                   rounded-2xl md:rounded-3xl
                   "
                 >
@@ -403,15 +367,13 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                   {template.channel === CommunicationChannel.EMAIL && (
                     <div className="mb-6 md:mb-10 relative z-10 group shrink-0">
                       <div className="flex flex-wrap justify-between items-end mb-2 md:mb-3 border-b border-black/5 pb-2 gap-2">
-                        <label className="text-[9px] md:text-[10px] font-sans font-bold uppercase tracking-[0.2em] text-gray-400">Assunto</label>
-                        <motion.button 
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
+                        <label className="text-editorial-label text-gray-400">Assunto</label>
+                        <MagneticButton 
                           onClick={() => copyToClipboard(subject, 'subject')}
-                          className={`flex items-center gap-1.5 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.2em] hover:underline transition-colors font-sans ${isCopied('subject') ? 'text-black' : 'text-gray-400 hover:text-black'}`}
+                          className={`flex items-center gap-1.5 text-editorial-label hover:underline transition-colors font-sans ${isCopied('subject') ? 'text-black' : 'text-gray-400 hover:text-black'}`}
                         >
-                          {isCopied('subject') ? <><Check size={12} strokeWidth={1.5} /><span>Copiado</span></> : <><Copy size={12} strokeWidth={1.5} /><span>Copiar Assunto</span></>}
-                        </motion.button>
+                          {isCopied('subject') ? <><Check size={10} strokeWidth={1.5} /><span>Copiado</span></> : <><Copy size={10} strokeWidth={1.5} /><span>Copiar Assunto</span></>}
+                        </MagneticButton>
                       </div>
                       <input
                         type="text"
@@ -428,33 +390,33 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                       ref={mainTextareaRef}
                       value={content}
                       onChange={(e) => setContent(e.target.value)}
-                      style={{ fontFamily: 'Calibri, "Segoe UI", Carlito, sans-serif', fontSize: '12pt', lineHeight: '1.7', color: '#1a1a1a' }}
-                      className="w-full min-h-[200px] bg-transparent border-none focus:ring-0 outline-none resize-none placeholder:text-gray-400/30 overflow-hidden"
+                      style={{ color: '#1a1a1a' }}
+                      className="w-full min-h-[200px] bg-transparent border-none focus:ring-0 outline-none resize-none placeholder:text-gray-400/30 overflow-hidden text-editorial-body placeholder:italic"
                       placeholder="Digite o conteúdo principal..."
                       spellCheck={false}
                       onInput={(e) => adjustTextareaHeight(e.target as HTMLTextAreaElement)}
                     />
                   </div>
-                </motion.div>
+                </div>
 
                 {secondaryContent !== '' && (
-                  <motion.div 
-                    variants={itemVariants}
+                  <div 
                     className="
+                    animate-entry
                     relative flex flex-col w-full
                     min-h-[15rem]
                     p-6 md:p-14
-                    bg-gradient-to-br from-white/70 via-white/50 to-white/30
+                    bg-gradient-to-br from-white/60 via-white/40 to-white/20
                     backdrop-blur-3xl
-                    border border-white/50 
-                    shadow-[0_20px_40px_-10px_rgba(0,0,0,0.05)]
+                    border border-white/40 
+                    shadow-[0_20px_40px_-10px_rgba(0,0,0,0.03)]
                     rounded-2xl md:rounded-3xl
                   ">
                     <div className="absolute inset-0 pointer-events-none opacity-[0.03] mix-blend-multiply rounded-2xl md:rounded-3xl" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'6\' height=\'6\' viewBox=\'0 0 6 6\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'%23000000\' fill-opacity=\'1\' fill-rule=\'evenodd\'%3E%3Cpath d=\'M5 0h1L0 6V5zM6 5v1H5z\'/%3E%3C/g%3E%3C/svg%3E")' }}></div>
                     <div className="mb-6 md:mb-10 relative z-10 shrink-0">
                       <div className="flex items-center gap-3 border-b border-black/5 pb-2">
                         <div className="w-1.5 h-1.5 bg-black/60 rotate-45"></div>
-                        <label className="text-[9px] md:text-[10px] font-sans font-bold uppercase tracking-[0.2em] text-gray-500">
+                        <label className="text-editorial-label text-gray-500">
                           {template.secondaryLabel || 'Conteúdo Adicional'}
                         </label>
                       </div>
@@ -464,65 +426,69 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                         ref={secondaryTextareaRef}
                         value={secondaryContent}
                         onChange={(e) => setSecondaryContent(e.target.value)}
-                        style={{ fontFamily: 'Calibri, "Segoe UI", Carlito, sans-serif', fontSize: '12pt', lineHeight: '1.7', color: '#1a1a1a' }}
-                        className="w-full min-h-[150px] bg-transparent border-none focus:ring-0 outline-none resize-none placeholder:text-gray-400/30 overflow-hidden"
+                        style={{ color: '#1a1a1a' }}
+                        className="w-full min-h-[150px] bg-transparent border-none focus:ring-0 outline-none resize-none placeholder:text-gray-400/30 overflow-hidden text-editorial-body placeholder:italic"
                         placeholder="Digite o conteúdo secundário..."
                         spellCheck={false}
                         onInput={(e) => adjustTextareaHeight(e.target as HTMLTextAreaElement)}
                       />
                     </div>
-                  </motion.div>
+                  </div>
                 )}
               </>
             )}
-          </motion.div>
+          </div>
         </div>
       </div>
 
+      {/* FOOTER ACTIONS - With "Glow" and Physics */}
       {!isScenarioMode && (
-        <motion.div 
-          variants={itemVariants}
-          className="flex-none bg-gradient-to-t from-white/70 via-white/50 to-white/30 backdrop-blur-2xl flex flex-col sm:flex-row sm:justify-end items-stretch sm:items-center gap-3 md:gap-4 border-t border-white/30 z-30"
+        <div 
+          className="animate-entry flex-none bg-gradient-to-t from-white/80 via-white/60 to-white/30 backdrop-blur-xl flex flex-col sm:flex-row sm:justify-end items-stretch sm:items-center gap-3 md:gap-4 border-t border-white/30 z-30"
           style={{ padding: 'clamp(1rem, 2vw, 2rem)' }}
         >
           {template.secondaryContent && (
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+            <MagneticButton
               onClick={() => copyToClipboard(secondaryContent, 'secondary')}
               className={`
-                group relative overflow-hidden flex items-center justify-center gap-2 md:gap-3 px-6 md:px-8 py-3.5 md:py-4 transition-colors duration-300 rounded-full
+                group relative overflow-hidden flex items-center justify-center gap-2 md:gap-3 px-6 md:px-8 py-3.5 md:py-4 transition-all duration-300 rounded-full border
                 ${isCopied('secondary')
-                  ? 'bg-black/90 text-white border-black/90 shadow-inner' 
-                  : 'bg-transparent text-gray-700 border-gray-300 hover:border-black/50 hover:text-black hover:bg-white/40 hover:shadow-[0_0_20px_rgba(255,255,255,0.4)]'}
-                border backdrop-blur-sm
+                  ? 'bg-black text-white border-black shadow-lg' 
+                  : 'bg-white/40 text-gray-600 border-white/50 hover:border-white/80 hover:text-black hover:shadow-[0_0_20px_rgba(255,255,255,0.5)]'}
               `}
             >
-              {isCopied('secondary') ? <Check size={16} strokeWidth={0.75} /> : <Copy size={16} strokeWidth={0.75} />}
-              <span className="text-[9px] md:text-xs font-bold uppercase tracking-[0.2em] whitespace-nowrap font-sans">
-                {isCopied('secondary') ? 'Copiado' : `Copiar ${template.secondaryLabel ? 'Protocolo' : 'Secundário'}`}
-              </span>
-            </motion.button>
+              <div className="relative z-10 flex items-center gap-2">
+                {isCopied('secondary') ? <Check size={14} strokeWidth={1} /> : <Copy size={14} strokeWidth={1} />}
+                <span className="text-editorial-label whitespace-nowrap font-sans">
+                  {isCopied('secondary') ? 'Copiado' : `Copiar ${template.secondaryLabel ? 'Protocolo' : 'Secundário'}`}
+                </span>
+              </div>
+            </MagneticButton>
           )}
-          <motion.button
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
+          
+          <MagneticButton
             onClick={() => copyToClipboard(content, 'main')}
             className={`
-              group relative overflow-hidden flex items-center justify-center gap-2 md:gap-3 px-8 md:px-12 py-3.5 md:py-4 transition-colors duration-300 rounded-full
+              group relative overflow-hidden flex items-center justify-center gap-2 md:gap-3 px-8 md:px-12 py-3.5 md:py-4 transition-all duration-300 rounded-full border
               ${isCopied('main') 
-                ? 'bg-black text-white shadow-inner' 
-                : 'bg-white/80 text-black hover:bg-black hover:text-white border-white/50 hover:shadow-[0_0_25px_rgba(255,255,255,0.6)]'}
-              border shadow-sm
+                ? 'bg-black text-white border-black shadow-lg' 
+                : 'bg-white/70 text-black border-white/50 hover:bg-white hover:border-white shadow-sm hover:shadow-[0_0_30px_rgba(255,255,255,0.9)]'}
             `}
           >
-            {isCopied('main') ? <Check size={16} strokeWidth={0.75} /> : <Copy size={16} strokeWidth={0.75} />}
-            <span className="text-[9px] md:text-xs font-bold uppercase tracking-[0.2em] whitespace-nowrap font-sans">
-              {isCopied('main') ? 'Copiado' : `Copiar ${template.secondaryContent ? 'Email' : 'Texto'}`}
-            </span>
-          </motion.button>
-        </motion.div>
+             {/* Glow Effect Element - Physics based appearance */}
+            <div 
+              className="absolute inset-0 bg-white/60 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+            />
+            
+            <div className="relative z-10 flex items-center gap-2">
+               {isCopied('main') ? <Check size={14} strokeWidth={1} /> : <Copy size={14} strokeWidth={1} />}
+               <span className="text-editorial-label whitespace-nowrap font-sans">
+                 {isCopied('main') ? 'Copiado' : `Copiar ${template.secondaryContent ? 'Email' : 'Texto'}`}
+               </span>
+            </div>
+          </MagneticButton>
+        </div>
       )}
-    </motion.div>
+    </div>
   );
 };

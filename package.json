@@ -13,7 +13,9 @@
     "react-dom": "18.2.0",
     "lucide-react": "0.344.0",
     "framer-motion": "11.0.8",
-    "@google/genai": "^1.37.0"
+    "@google/genai": "^1.37.0",
+    "@studio-freight/lenis": "1.0.42",
+    "gsap": "^3.14.2"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
