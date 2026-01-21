@@ -12,18 +12,31 @@ const App: React.FC = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Performance: Debounce search query by 300ms
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Search Logic updated to use debounced query
+  // Initialize isMobile safely based on window presence to avoid hydration mismatch if SSR (though this is likely SPA)
+  // For standard React SPA, window is available.
+  const [isMobile, setIsMobile] = useState(() => 
+    typeof window !== 'undefined' ? window.innerWidth < 1024 : false
+  );
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      if (!mobile) setIsSidebarOpen(false); // Auto-close mobile drawer if resized to desktop
+    };
+    
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   const filteredTemplates = useMemo(() => {
     let filtered = INITIAL_TEMPLATES || [];
-    
-    // Normalize string to ignore accents and case
     const normalize = (str: string) => 
       str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "";
 
@@ -58,29 +71,13 @@ const App: React.FC = () => {
       ? 'Visão Geral' 
       : CATEGORIES.find(c => c.id === selectedCategory)?.name || 'Módulo');
 
-  // Animation Variants
   const editorPanelVariants = {
-    initial: { 
-      opacity: 0, 
-      x: 30,
-      scale: 0.95
-    },
+    initial: { opacity: 0, x: 30, scale: 0.98 },
     animate: { 
-      opacity: 1, 
-      x: 0,
-      scale: 1,
-      transition: { 
-        type: "spring", 
-        stiffness: 300, 
-        damping: 30, // Heavier damping for a "solid" arrival
-        mass: 0.8 
-      }
+      opacity: 1, x: 0, scale: 1,
+      transition: { type: "spring", stiffness: 300, damping: 30, mass: 0.8 }
     },
-    exit: { 
-      opacity: 0, 
-      x: 20, 
-      transition: { duration: 0.2 } 
-    }
+    exit: { opacity: 0, x: 20, transition: { duration: 0.2 } }
   };
 
   const mobileEditorVariants = {
@@ -95,15 +92,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Helper to detect if mobile for animation logic
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
   return (
     <LayoutGroup>
       <div className="flex h-[100dvh] w-full overflow-hidden text-[#111] font-sans bg-transparent">
@@ -117,13 +105,17 @@ const App: React.FC = () => {
           }}
           isOpen={isSidebarOpen}
           onCloseMobile={() => setIsSidebarOpen(false)}
+          isMobile={isMobile}
         />
 
         <main className="flex-1 flex flex-col h-full overflow-hidden relative z-10 transition-all duration-500">
           
           {/* Mobile Header */}
           <header className="lg:hidden flex items-center justify-between px-5 py-3 bg-white/60 backdrop-blur-xl border-b border-white/20 sticky top-0 z-30 shrink-0">
-            <button onClick={() => setIsSidebarOpen(true)} className="p-2 -ml-2 text-black active:scale-95 transition-transform">
+            <button 
+              onClick={() => setIsSidebarOpen(true)} 
+              className="p-2 -ml-2 text-black active:scale-95 transition-transform rounded-full hover:bg-black/5"
+            >
               <Menu size={24} strokeWidth={1} />
             </button>
             <span className="font-serif italic text-xl font-medium tracking-tight text-black">QuickComms</span>
@@ -135,11 +127,13 @@ const App: React.FC = () => {
             
             {/* List Panel */}
             <motion.div 
-              layout // This makes the panel animate its width smoothly
+              layout 
               className={`
                 flex flex-col shrink-0 relative z-20 
-                flex w-full
-                ${selectedTemplate ? 'lg:w-[24rem] xl:w-[28rem] 2xl:w-[32rem]' : 'lg:w-full'}
+                w-full 
+                ${selectedTemplate 
+                  ? 'lg:flex-[0_0_24rem] xl:flex-[0_0_28rem] lg:max-w-[30vw]' 
+                  : 'lg:w-full'}
                 
                 bg-gradient-to-b from-white/80 via-white/50 to-white/30
                 backdrop-blur-2xl
@@ -154,7 +148,7 @@ const App: React.FC = () => {
               {/* Header Title */}
               <div className="px-6 pt-8 pb-4 shrink-0 z-10">
                 <motion.div
-                  layout="position" // Animate position when width changes
+                  layout="position"
                   key={currentCategoryName}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -164,7 +158,11 @@ const App: React.FC = () => {
                     <span className="text-[10px] font-sans font-bold uppercase tracking-[0.25em] text-gray-500 pl-1">
                       {debouncedSearchQuery ? 'Pesquisa' : 'Categoria'}
                     </span>
-                    <motion.h2 layout="position" className="text-4xl font-serif italic font-light text-black tracking-tight truncate pr-2">
+                    <motion.h2 
+                      layout="position" 
+                      className="font-serif italic font-light text-black tracking-tight truncate pr-2"
+                      style={{ fontSize: 'clamp(1.8rem, 2.5vw, 2.5rem)' }}
+                    >
                       {currentCategoryName}
                     </motion.h2>
                   </div>
@@ -227,14 +225,14 @@ const App: React.FC = () => {
                     ) : (
                       filteredTemplates.map((template, index) => (
                         <motion.button
-                          layout="position" // CRITICAL: Makes items glide when list width changes
+                          layout="position"
                           key={template.id}
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           whileHover={{ scale: 1.01, backgroundColor: 'rgba(255,255,255,0.6)' }}
                           whileTap={{ scale: 0.98 }}
                           transition={{ 
-                            delay: index * 0.04, // Staggered entrance
+                            delay: index * 0.04, 
                             type: "spring", stiffness: 300, damping: 25 
                           }}
                           onClick={() => setSelectedTemplate(template)}
@@ -279,7 +277,6 @@ const App: React.FC = () => {
                 </div>
               </div>
               
-              {/* Status Footer */}
               <div className="px-6 py-3 border-t border-white/20 bg-white/10 backdrop-blur-md flex justify-between items-center z-10">
                  <span className="text-[10px] text-gray-400 font-medium">
                     {filteredTemplates.length} {filteredTemplates.length === 1 ? 'modelo' : 'modelos'}
@@ -293,14 +290,12 @@ const App: React.FC = () => {
 
             </motion.div>
 
-            {/* Editor Panel Wrapper with AnimatePresence */}
             <AnimatePresence mode="wait">
               {selectedTemplate ? (
                 <motion.div
                   key="editor-panel"
                   className={`
                     flex-1 h-full min-w-0
-                    /* Fixed on mobile to overlay, static on desktop to sit beside */
                     fixed inset-0 z-50 lg:static 
                     bg-[#f5f5f7] lg:bg-transparent
                     lg:rounded-3xl lg:border border-white/0
@@ -317,7 +312,6 @@ const App: React.FC = () => {
                    />
                 </motion.div>
               ) : (
-                // Empty State
                 !isMobile && (
                   <motion.div 
                     key="empty-state"

@@ -191,8 +191,10 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
       animate="visible"
       className="h-full flex flex-col bg-transparent overflow-y-auto custom-scrollbar relative lg:rounded-3xl"
     >
-      {/* Editorial Header */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between px-6 md:px-12 py-6 md:py-8 shrink-0 gap-6 border-b border-white/30 relative z-20 bg-gradient-to-b from-white/70 via-white/50 to-white/20 backdrop-blur-2xl">
+      {/* Editorial Header - Fluid Padding */}
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 border-b border-white/30 relative z-20 bg-gradient-to-b from-white/70 via-white/50 to-white/20 backdrop-blur-2xl shrink-0"
+           style={{ padding: 'clamp(1.5rem, 3vw, 2.5rem)' }}>
+        
         <div className="flex items-start md:items-center space-x-4 md:space-x-6">
           <motion.button 
             whileHover={{ scale: 1.1 }}
@@ -213,7 +215,8 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
              {/* Fluid Typography using Clamp for stable scaling */}
              <motion.h1 
                layoutId={`title-${template.id}`}
-               className="font-serif italic text-[clamp(1.75rem,2.5vw,3rem)] text-black leading-[0.9] drop-shadow-sm font-light tracking-tight break-words hyphens-auto pr-2"
+               className="font-serif italic text-black leading-[0.9] drop-shadow-sm font-light tracking-tight break-words hyphens-auto pr-2"
+               style={{ fontSize: 'clamp(1.75rem, 4vw, 3rem)' }}
              >
                {template.title}
              </motion.h1>
@@ -317,9 +320,9 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
         )}
       </AnimatePresence>
 
-      <div className="flex-1 px-4 lg:px-12 py-6 md:py-12">
+      <div className="flex-1" style={{ padding: 'clamp(1rem, 3vw, 3rem)' }}>
         <motion.div 
-          className="max-w-4xl mx-auto flex flex-col gap-6 md:gap-12 pb-24 md:pb-20"
+          className="max-w-4xl mx-auto flex flex-col gap-6 md:gap-12 pb-24 md:pb-20 h-full"
           initial="hidden"
           animate="visible"
           variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
@@ -373,7 +376,8 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
               <motion.div 
                 variants={itemVariants}
                 className="
-                relative min-h-[25rem] md:min-h-[30rem] 
+                relative flex flex-col flex-1
+                min-h-[30vh]
                 p-6 md:p-14
                 bg-gradient-to-br from-white/70 via-white/50 to-white/30
                 backdrop-blur-3xl
@@ -385,7 +389,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                 <div className="absolute inset-0 pointer-events-none opacity-[0.03] mix-blend-multiply rounded-2xl md:rounded-3xl" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'6\' height=\'6\' viewBox=\'0 0 6 6\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'%23000000\' fill-opacity=\'1\' fill-rule=\'evenodd\'%3E%3Cpath d=\'M5 0h1L0 6V5zM6 5v1H5z\'/%3E%3C/g%3E%3C/svg%3E")' }}></div>
                 
                 {template.channel === CommunicationChannel.EMAIL && (
-                  <div className="mb-6 md:mb-10 relative z-10 group">
+                  <div className="mb-6 md:mb-10 relative z-10 group shrink-0">
                     <div className="flex flex-wrap justify-between items-end mb-2 md:mb-3 border-b border-black/5 pb-2 gap-2">
                       <label className="text-[9px] md:text-[10px] font-sans font-bold uppercase tracking-[0.2em] text-gray-400">Assunto</label>
                       <motion.button 
@@ -407,14 +411,14 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                   </div>
                 )}
 
-                <div className="relative z-10 h-full flex flex-col">
+                <div className="relative z-10 flex flex-col flex-1">
                   <textarea
                     ref={mainTextareaRef}
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     style={{ fontFamily: 'Calibri, "Segoe UI", Carlito, sans-serif', fontSize: '12pt', lineHeight: '1.7', color: '#1a1a1a' }}
-                    // Using REM for min-height consistency
-                    className="w-full h-full min-h-[25rem] md:min-h-[30rem] bg-transparent border-none focus:ring-0 outline-none resize-none placeholder:text-gray-400/30 overflow-hidden"
+                    // Changed from min-h-[25rem] to flex-1 to allow dynamic expansion without forcing scroll on small screens
+                    className="w-full flex-1 min-h-[200px] bg-transparent border-none focus:ring-0 outline-none resize-none placeholder:text-gray-400/30 overflow-hidden"
                     placeholder="Digite o conteúdo principal..."
                     spellCheck={false}
                     onInput={(e) => adjustTextareaHeight(e.target as HTMLTextAreaElement)}
@@ -426,7 +430,8 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                 <motion.div 
                   variants={itemVariants}
                   className="
-                  relative min-h-[12rem] md:min-h-[18rem] 
+                  relative flex flex-col
+                  min-h-[15rem]
                   p-6 md:p-14
                   bg-gradient-to-br from-white/70 via-white/50 to-white/30
                   backdrop-blur-3xl
@@ -435,7 +440,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                   rounded-2xl md:rounded-3xl
                 ">
                   <div className="absolute inset-0 pointer-events-none opacity-[0.03] mix-blend-multiply rounded-2xl md:rounded-3xl" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'6\' height=\'6\' viewBox=\'0 0 6 6\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'%23000000\' fill-opacity=\'1\' fill-rule=\'evenodd\'%3E%3Cpath d=\'M5 0h1L0 6V5zM6 5v1H5z\'/%3E%3C/g%3E%3C/svg%3E")' }}></div>
-                  <div className="mb-6 md:mb-10 relative z-10">
+                  <div className="mb-6 md:mb-10 relative z-10 shrink-0">
                     <div className="flex items-center gap-3 border-b border-black/5 pb-2">
                       <div className="w-1.5 h-1.5 bg-black/60 rotate-45"></div>
                       <label className="text-[9px] md:text-[10px] font-sans font-bold uppercase tracking-[0.2em] text-gray-500">
@@ -443,14 +448,13 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                       </label>
                     </div>
                   </div>
-                  <div className="relative z-10 h-full flex flex-col">
+                  <div className="relative z-10 flex flex-col flex-1">
                     <textarea
                       ref={secondaryTextareaRef}
                       value={secondaryContent}
                       onChange={(e) => setSecondaryContent(e.target.value)}
                       style={{ fontFamily: 'Calibri, "Segoe UI", Carlito, sans-serif', fontSize: '12pt', lineHeight: '1.7', color: '#1a1a1a' }}
-                      // Using REM for min-height consistency
-                      className="w-full h-full min-h-[10rem] bg-transparent border-none focus:ring-0 outline-none resize-none placeholder:text-gray-400/30 overflow-hidden"
+                      className="w-full flex-1 min-h-[150px] bg-transparent border-none focus:ring-0 outline-none resize-none placeholder:text-gray-400/30 overflow-hidden"
                       placeholder="Digite o conteúdo secundário..."
                       spellCheck={false}
                       onInput={(e) => adjustTextareaHeight(e.target as HTMLTextAreaElement)}
@@ -464,7 +468,8 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
       </div>
 
       {!isScenarioMode && (
-        <div className="sticky bottom-0 z-30 px-6 md:px-12 py-6 md:py-8 bg-gradient-to-t from-white/70 via-white/50 to-white/30 backdrop-blur-2xl flex flex-col sm:flex-row sm:justify-end items-stretch sm:items-center gap-3 md:gap-4 border-t border-white/30">
+        <div className="sticky bottom-0 z-30 bg-gradient-to-t from-white/70 via-white/50 to-white/30 backdrop-blur-2xl flex flex-col sm:flex-row sm:justify-end items-stretch sm:items-center gap-3 md:gap-4 border-t border-white/30"
+             style={{ padding: 'clamp(1rem, 2vw, 2rem)' }}>
           {template.secondaryContent && (
             <motion.button
               whileHover={{ scale: 1.02 }}
