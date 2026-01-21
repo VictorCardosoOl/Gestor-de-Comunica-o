@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Template, CommunicationChannel } from '../types';
-import { Copy, RefreshCw, Check, MoveLeft, Sparkles, SlidersHorizontal, Loader2, Quote } from 'lucide-react';
+import { Copy, RefreshCw, Check, MoveLeft, SlidersHorizontal, Quote } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { refineText } from '../services/geminiService';
 import { useTemplateCopier } from '../hooks/useTemplateCopier';
 
 interface EditorProps {
@@ -39,8 +38,6 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
   const [secondaryContent, setSecondaryContent] = useState(template.secondaryContent || '');
   const [variableValues, setVariableValues] = useState<Record<string, string>>({});
   const [showVariables, setShowVariables] = useState(true);
-  
-  const [isRefining, setIsRefining] = useState(false);
 
   // Use Custom Hook for Copy Logic
   const { copyToClipboard, isCopied } = useTemplateCopier();
@@ -164,20 +161,6 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
       setVariableValues({});
     }
   };
-  
-  const handleAiRefine = async () => {
-    if (!content || isRefining) return;
-    setIsRefining(true);
-    try {
-      const refined = await refineText(content, `Canal: ${template.channel}. Objetivo: Melhorar clareza, correção gramatical e tom profissional. Mantenha estritamente as variáveis.`);
-      setContent(refined);
-    } catch (error) {
-      console.error(error);
-      alert('Não foi possível conectar à IA no momento.');
-    } finally {
-      setIsRefining(false);
-    }
-  };
 
   return (
     <motion.div 
@@ -203,7 +186,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
              <div className="flex items-center gap-3">
                <span className="w-1.5 h-1.5 bg-black/80 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.2)]"></span>
                <span className="text-[9px] font-sans font-bold uppercase tracking-[0.25em] text-black/60">
-                  {template.channel === CommunicationChannel.EMAIL ? 'Email Template' : (template.channel === 'PROMPT' ? 'AI Prompt' : 'Message')}
+                  {template.channel === CommunicationChannel.EMAIL ? 'Email Template' : 'Message'}
                </span>
              </div>
              <motion.h1 
@@ -216,28 +199,6 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
         </div>
         
         <div className="flex flex-wrap items-center gap-2 md:gap-3 self-start md:self-auto pt-2 xl:pt-0">
-          {!isScenarioMode && (
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleAiRefine}
-              disabled={isRefining}
-              className={`
-                flex items-center gap-2 px-4 py-2 md:px-5 md:py-2.5 rounded-full transition-colors duration-300
-                ${isRefining 
-                  ? 'bg-white/50 text-black/40 cursor-wait' 
-                  : 'bg-white/40 hover:bg-white/80 border border-white/40 shadow-sm hover:shadow-md text-gray-800'}
-              `}
-            >
-              {isRefining ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} strokeWidth={0.75} className="text-gray-600" />}
-              <span className="text-[9px] font-bold uppercase tracking-[0.2em] font-sans">
-                {isRefining ? 'Processando' : 'Otimizar'}
-              </span>
-            </motion.button>
-          )}
-
-          <div className="hidden sm:block w-px h-6 bg-black/10 mx-1"></div>
-
           {placeholders.length > 0 && (
              <motion.button 
               whileHover={{ scale: 1.1, rotate: 90 }}
@@ -274,7 +235,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
           >
             <div className="px-6 md:px-12 py-8 md:py-10">
               <div className="flex items-center gap-2 mb-6 md:mb-8 text-black/70">
-                <Sparkles size={14} strokeWidth={1} />
+                <SlidersHorizontal size={14} strokeWidth={1} />
                 <span className="text-[9px] font-bold uppercase tracking-[0.25em] font-sans">Preenchimento Automático</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-12 gap-y-8 md:gap-y-10">
