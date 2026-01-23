@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
 import { Template, CommunicationChannel } from '../types';
-import { Copy, RefreshCw, Check, MoveLeft, Sparkles, SlidersHorizontal, Loader2, Quote, X } from 'lucide-react';
+import { Copy, RefreshCw, Check, MoveLeft, Sparkles, SlidersHorizontal, Loader2, Quote, X, Calendar, Clock, AlignLeft } from 'lucide-react';
 import { refineText } from '../services/geminiService';
 import { useTemplateCopier } from '../hooks/useTemplateCopier';
 import { MagneticButton } from './MagneticButton';
@@ -19,8 +19,16 @@ interface Scenario {
 
 export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
   const [subject, setSubject] = useState(template.subject || '');
+  
+  // rawContent holds the template WITH placeholders (e.g., [Data]). 
+  // This is the source of truth for generating the final content when inputs change.
+  const [rawContent, setRawContent] = useState(template.content);
+  const [rawSecondaryContent, setRawSecondaryContent] = useState(template.secondaryContent || '');
+
+  // content holds the displayed text (Values replacing Placeholders)
   const [content, setContent] = useState(template.content);
   const [secondaryContent, setSecondaryContent] = useState(template.secondaryContent || '');
+
   const [variableValues, setVariableValues] = useState<Record<string, string>>({});
   const [showVariables, setShowVariables] = useState(true);
   
@@ -32,12 +40,53 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
 
   const isScenarioMode = useMemo(() => template.content.includes('[CENÁRIO:'), [template]);
 
-  // --- LOGIC ---
+  // --- HELPER FUNCTIONS ---
+  const getInputType = (placeholder: string) => {
+    const lower = placeholder.toLowerCase();
+    if (lower.includes('data')) return 'date';
+    if (lower.includes('horário') || lower.includes('inicio') || lower.includes('fim')) return 'time';
+    if (lower.includes('módulos') || lower.includes('conteúdo') || lower.includes('lista')) return 'textarea';
+    return 'text';
+  };
+
+  const formatValueForText = (value: string, type: string) => {
+    if (!value) return '';
+    if (type === 'date') {
+      // Input date is YYYY-MM-DD, output should be DD/MM/YYYY
+      const parts = value.split('-');
+      if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return value;
+  };
+
+  const calculateDuration = (start: string, end: string) => {
+    if (!start || !end) return '';
+    const [startH, startM] = start.split(':').map(Number);
+    const [endH, endM] = end.split(':').map(Number);
+    
+    let diffMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+    if (diffMinutes < 0) diffMinutes += 24 * 60; 
+
+    const hours = Math.floor(diffMinutes / 60);
+    const minutes = diffMinutes % 60;
+
+    return `${String(hours).padStart(2, '0')}h${String(minutes).padStart(2, '0')}`;
+  };
+
+  const generateOSFromDate = (dateStr: string) => {
+    // Input: YYYY-MM-DD -> Output: YYYYMMDD
+    if (!dateStr) return '';
+    return dateStr.replace(/-/g, '');
+  };
+
   const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour >= 5 && hour < 12) return 'Bom dia';
-    if (hour >= 12 && hour < 18) return 'Boa tarde';
-    return 'Boa noite';
+    const date = new Date();
+    const hour = date.getHours();
+    const minutes = date.getMinutes();
+    const totalMinutes = hour * 60 + minutes;
+    if (totalMinutes >= 420 && totalMinutes <= 720) return 'bom dia';
+    if (totalMinutes > 720 && totalMinutes <= 1080) return 'boa tarde';
+    return 'boa noite';
   };
 
   const getFormattedToday = () => {
@@ -56,22 +105,34 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
     return str.charAt(0).toUpperCase() + str.slice(1);
   };
 
-  const processTemplate = useCallback((rawContent: string) => {
-    if (!rawContent) return '';
-    let processed = rawContent;
+  // --- PRE-PROCESSING ---
+  const processStaticTags = useCallback((text: string) => {
+    if (!text) return '';
+    let processed = text;
     if (processed.includes('[Saudação]')) processed = processed.replace(/\[Saudação\]/g, getGreeting());
     if (processed.includes('[Data Hoje]')) processed = processed.replace(/\[Data Hoje\]/g, getFormattedToday());
     if (processed.includes('[Data Extenso]')) processed = processed.replace(/\[Data Extenso\]/g, getFormattedNextBusinessDay());
     return processed;
   }, []);
 
+  // Initialize
   useEffect(() => {
     setSubject(template.subject || '');
-    setContent(processTemplate(template.content)); 
-    setSecondaryContent(processTemplate(template.secondaryContent || ''));
-    setVariableValues({});
-  }, [template, processTemplate]);
+    
+    // Process static tags immediately into the RAW content, so they are fixed
+    const processedContent = processStaticTags(template.content);
+    const processedSecondary = processStaticTags(template.secondaryContent || '');
 
+    setRawContent(processedContent);
+    setRawSecondaryContent(processedSecondary);
+    
+    setContent(processedContent);
+    setSecondaryContent(processedSecondary);
+    
+    setVariableValues({});
+  }, [template, processStaticTags]);
+
+  // Adjust textareas
   const adjustTextareaHeight = (element: HTMLTextAreaElement | null) => {
     if (element) {
       element.style.height = 'auto';
@@ -87,22 +148,12 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
     return () => clearTimeout(timer);
   }, [content, secondaryContent, isScenarioMode, template.id]);
 
-  const scenarios: Scenario[] = useMemo(() => {
-    if (!isScenarioMode) return [];
-    const rawSegments = content.split('[').filter(s => s.trim().length > 0);
-    
-    return rawSegments.map(seg => {
-      if (!seg.startsWith('CENÁRIO:')) return null;
-      const closingBracketIndex = seg.indexOf(']');
-      if (closingBracketIndex === -1) return null;
-      const title = seg.substring(8, closingBracketIndex).trim(); 
-      const text = seg.substring(closingBracketIndex + 1).trim();
-      return { title, text };
-    }).filter((item): item is Scenario => item !== null);
-  }, [content, isScenarioMode]);
-
+  // Detect Placeholders from the TEMPLATE (not the current content which might have them replaced)
   const placeholders = useMemo(() => {
     const regex = /\[(.*?)\]/g;
+    // We look at the RAW content to find placeholders that haven't been filled yet, 
+    // OR we look at the original template. 
+    // Better to use the template as source of truth for inputs.
     const allText = `${template.subject || ''} ${template.content} ${template.secondaryContent || ''} ${template.tertiaryContent || ''}`;
     const found = allText.match(regex);
     if (!found) return [];
@@ -115,22 +166,72 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
     );
   }, [template]);
 
-  const handleVariableChange = (placeholder: string, inputValue: string) => {
-    const oldValue = variableValues[placeholder] || placeholder;
-    const newValue = inputValue === '' ? placeholder : inputValue;
-    setVariableValues(prev => ({ ...prev, [placeholder]: newValue }));
+  // --- CORE REPLACEMENT LOGIC ---
+  const generateContentFromRaw = (baseText: string, values: Record<string, string>) => {
+    let result = baseText;
     
-    const replaceInText = (text: string) => text.split(oldValue).join(newValue);
-    setSubject(prev => replaceInText(prev));
-    setContent(prev => replaceInText(prev));
-    setSecondaryContent(prev => replaceInText(prev));
+    // Iterate over ALL placeholders found in the template
+    placeholders.forEach(ph => {
+      const type = getInputType(ph);
+      // Value from state or empty
+      const rawVal = values[ph] || ''; 
+      
+      // If we have a value, or if it's a specific calculated field that might be empty
+      // actually, if it's empty, we keep the placeholder? 
+      // No, usually users want to see the blank space filled or removed.
+      // Let's keep the placeholder if empty, so they see what's missing in the text.
+      if (rawVal) {
+        const formattedVal = formatValueForText(rawVal, type);
+        // Global replace of the placeholder
+        result = result.split(ph).join(formattedVal);
+      }
+    });
+
+    return result;
+  };
+
+  const handleVariableChange = (placeholder: string, inputValue: string) => {
+    // 1. Update values state
+    const newValues = { ...variableValues, [placeholder]: inputValue };
+
+    // 2. Run Automation Logic (Updates newValues directly)
+    if (placeholder === '[Horário Início]' || placeholder === '[Horário Fim]') {
+      const start = placeholder === '[Horário Início]' ? inputValue : newValues['[Horário Início]'];
+      const end = placeholder === '[Horário Fim]' ? inputValue : newValues['[Horário Fim]'];
+      if (start && end) {
+        newValues['[Duração]'] = calculateDuration(start, end);
+      }
+    }
+    if (placeholder === '[Data]') {
+      newValues['[Número OS]'] = generateOSFromDate(inputValue);
+    }
+
+    setVariableValues(newValues);
+
+    // 3. Rebuild Content from RAW (This fixes the "Comercialadastro" bug)
+    // We go back to the source (rawContent) and apply ALL current values.
+    // This ensures we never replace partial words, only the [Placeholders].
+    const newContent = generateContentFromRaw(rawContent, newValues);
+    const newSecondary = generateContentFromRaw(rawSecondaryContent, newValues);
+    const newSubject = generateContentFromRaw(template.subject || '', newValues); // Subject usually doesn't need raw state logic as it's simple, but safe to do.
+
+    setContent(newContent);
+    setSecondaryContent(newSecondary);
+    setSubject(newSubject);
   };
 
   const handleReset = () => {
     if (window.confirm('Restaurar texto original?')) {
+      // Re-process static tags
+      const processedContent = processStaticTags(template.content);
+      const processedSecondary = processStaticTags(template.secondaryContent || '');
+      
+      setRawContent(processedContent);
+      setRawSecondaryContent(processedSecondary);
+      
+      setContent(processedContent);
+      setSecondaryContent(processedSecondary);
       setSubject(template.subject || '');
-      setContent(processTemplate(template.content)); 
-      setSecondaryContent(processTemplate(template.secondaryContent || ''));
       setVariableValues({});
     }
   };
@@ -139,8 +240,25 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
     if (!content || isRefining) return;
     setIsRefining(true);
     try {
-      const refined = await refineText(content, `Canal: ${template.channel}. Objetivo: Melhorar clareza, correção gramatical e tom profissional. Mantenha estritamente as variáveis.`);
+      const refined = await refineText(content, `Canal: ${template.channel}. Objetivo: Melhorar clareza, correção gramatical e tom profissional. Mantenha estritamente as variáveis e a formatação (negrito, links).`);
+      
+      // When AI refines, it becomes the new "RAW" source of truth.
+      // We assume the AI respected the prompt and kept the [Placeholders] or the values currently in them.
+      // If it kept values, we can't revert easily. If it kept placeholders (best case), we set it as raw.
+      // Given the prompt asks to keep variables, it usually keeps the *text* that is currently there.
+      // Since 'content' currently has values filled in, the AI will refine the text *with values*.
+      // This breaks the "Rebuild from Raw" logic for subsequent edits.
+      
+      // FIX: To support AI + Input flow, we effectively "commit" the current state.
+      // The user can continue editing, but variables might be lost if AI removed brackets.
+      // We set the refined text as the new content.
       setContent(refined);
+      
+      // We update rawContent to this new refined text, but we must acknowledge that
+      // if values were already filled, the placeholders are gone.
+      // The user will have to manually edit or reset if they want to change variables via inputs after AI.
+      setRawContent(refined); 
+
     } catch (error) {
       console.error(error);
       alert('Não foi possível conectar à IA no momento.');
@@ -149,37 +267,20 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
     }
   };
 
-  // --- MOTION SYSTEM (GSAP) ---
+  // --- MOTION ---
   useLayoutEffect(() => {
     const ctx = gsap.context(() => {
-      // 1. Title Reveal (Character stagger)
       const tl = gsap.timeline();
-      
       tl.from(".char-reveal", {
-        yPercent: 120,
-        opacity: 0,
-        rotationZ: 5,
-        stagger: 0.02,
-        duration: 1,
-        ease: "power4.out"
+        yPercent: 120, opacity: 0, rotationZ: 5, stagger: 0.02, duration: 1, ease: "power4.out"
       });
-
-      // 2. Elements Entry (Inertia Stagger)
       tl.from(".animate-entry", {
-        y: 60,
-        opacity: 0,
-        duration: 1.2,
-        stagger: 0.1,
-        ease: "power3.out",
-        clearProps: "all"
+        y: 60, opacity: 0, duration: 1.2, stagger: 0.1, ease: "power3.out", clearProps: "all"
       }, "-=0.8");
-
     }, containerRef);
-
     return () => ctx.revert();
   }, [template.id]);
 
-  // Helper for text splitting
   const splitText = (text: string) => {
     return text.split("").map((char, i) => (
       <span key={i} className="inline-block overflow-hidden align-top">
@@ -190,12 +291,26 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
     ));
   };
 
+  // --- SCENARIO DATA ---
+  const scenarios: Scenario[] = useMemo(() => {
+    if (!isScenarioMode) return [];
+    const rawSegments = content.split('[').filter(s => s.trim().length > 0);
+    return rawSegments.map(seg => {
+      if (!seg.startsWith('CENÁRIO:')) return null;
+      const closingBracketIndex = seg.indexOf(']');
+      if (closingBracketIndex === -1) return null;
+      const title = seg.substring(8, closingBracketIndex).trim(); 
+      const text = seg.substring(closingBracketIndex + 1).trim();
+      return { title, text };
+    }).filter((item): item is Scenario => item !== null);
+  }, [content, isScenarioMode]);
+
   return (
     <div 
       ref={containerRef}
       className="h-full flex flex-col bg-transparent relative lg:rounded-3xl overflow-hidden"
     >
-      {/* Editorial Header with Sticky Blur */}
+      {/* Editorial Header */}
       <div 
         className="flex-none flex flex-col xl:flex-row xl:items-center justify-between gap-6 border-b border-white/20 relative z-20 bg-gradient-to-b from-white/60 via-white/40 to-white/10 backdrop-blur-2xl shrink-0"
         style={{ padding: 'clamp(1.5rem, 3vw, 2.5rem)' }}
@@ -238,9 +353,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
               </span>
             </MagneticButton>
           )}
-
           <div className="hidden sm:block w-px h-6 bg-black/5 mx-1"></div>
-
           {placeholders.length > 0 && (
              <MagneticButton 
               onClick={() => setShowVariables(!showVariables)}
@@ -257,7 +370,6 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
           >
             <RefreshCw size={16} strokeWidth={0.75} />
           </MagneticButton>
-          
           <MagneticButton
             onClick={onClose}
             className="hidden lg:flex p-2.5 md:p-3 rounded-full text-gray-400 hover:text-black hover:bg-white/30 transition-colors"
@@ -268,7 +380,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
         </div>
       </div>
 
-       {/* Scrollable Content Area */}
+       {/* Variable Inputs */}
        <div className="flex-1 overflow-y-auto custom-scrollbar relative">
          {placeholders.length > 0 && showVariables && (
             <div 
@@ -280,24 +392,49 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                   <span className="text-editorial-label font-sans">Preenchimento Automático</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-12 gap-y-8 md:gap-y-10">
-                  {placeholders.map((placeholder) => (
-                    <div key={placeholder} className="relative group">
-                      <input 
-                        type="text" 
-                        id={placeholder}
-                        className="peer w-full bg-transparent border-b border-black/10 focus:border-black/80 text-base md:text-lg py-2 transition-all outline-none font-serif italic text-black placeholder-transparent"
-                        placeholder={placeholder}
-                        value={variableValues[placeholder] === placeholder ? '' : variableValues[placeholder]} 
-                        onChange={(e) => handleVariableChange(placeholder, e.target.value)}
-                      />
-                      <label 
-                        htmlFor={placeholder}
-                        className="absolute left-0 -top-4 text-editorial-label text-gray-400 transition-all peer-placeholder-shown:text-xs peer-placeholder-shown:top-2.5 peer-placeholder-shown:text-gray-400/70 peer-focus:-top-4 peer-focus:text-[9px] peer-focus:text-black cursor-text"
-                      >
-                        {placeholder.replace('[', '').replace(']', '')}
-                      </label>
-                    </div>
-                  ))}
+                  {placeholders.map((placeholder) => {
+                    const inputType = getInputType(placeholder);
+                    return (
+                      <div key={placeholder} className={`relative group ${inputType === 'textarea' ? 'col-span-1 sm:col-span-2' : ''}`}>
+                        <div className="relative">
+                          {inputType === 'textarea' ? (
+                            <textarea
+                              id={placeholder}
+                              className="peer w-full bg-transparent border-b border-black/10 focus:border-black/80 text-base md:text-lg py-2 transition-all outline-none font-serif italic text-black placeholder-transparent min-h-[3rem] resize-y"
+                              placeholder={placeholder}
+                              value={variableValues[placeholder] || ''}
+                              onChange={(e) => handleVariableChange(placeholder, e.target.value)}
+                              rows={1}
+                            />
+                          ) : (
+                            <input 
+                              type={inputType}
+                              id={placeholder}
+                              className={`
+                                peer w-full bg-transparent border-b border-black/10 focus:border-black/80 
+                                text-base md:text-lg py-2 transition-all outline-none 
+                                font-serif italic text-black placeholder-transparent
+                                ${inputType === 'date' || inputType === 'time' ? 'pr-8' : ''}
+                              `}
+                              placeholder={placeholder}
+                              value={variableValues[placeholder] || ''} 
+                              onChange={(e) => handleVariableChange(placeholder, e.target.value)}
+                            />
+                          )}
+                          
+                          {inputType === 'date' && <Calendar size={14} className="absolute right-0 top-3 text-gray-400 pointer-events-none" />}
+                          {inputType === 'time' && <Clock size={14} className="absolute right-0 top-3 text-gray-400 pointer-events-none" />}
+                          {inputType === 'textarea' && <AlignLeft size={14} className="absolute right-0 top-3 text-gray-400 pointer-events-none" />}
+                        </div>
+                        <label 
+                          htmlFor={placeholder}
+                          className="absolute left-0 -top-4 text-editorial-label text-gray-400 transition-all peer-placeholder-shown:text-xs peer-placeholder-shown:top-2.5 peer-placeholder-shown:text-gray-400/70 peer-focus:-top-4 peer-focus:text-[9px] peer-focus:text-black cursor-text"
+                        >
+                          {placeholder.replace('[', '').replace(']', '')}
+                        </label>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -305,38 +442,16 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
 
         <div className="w-full" style={{ padding: 'clamp(1rem, 3vw, 3rem)' }}>
           <div className="max-w-4xl mx-auto flex flex-col gap-6 md:gap-12 pb-12">
-            {/* --- SCENARIO LIST MODE --- */}
             {isScenarioMode ? (
               <div className="grid grid-cols-1 gap-6">
                   {scenarios.map((scene, idx) => (
-                    <div 
-                      key={idx}
-                      className="
-                        animate-entry
-                        relative p-6 md:p-8
-                        bg-gradient-to-br from-white/60 via-white/40 to-white/20
-                        backdrop-blur-3xl border border-white/40 
-                        shadow-[0_10px_30px_-10px_rgba(0,0,0,0.03)]
-                        rounded-2xl
-                        flex flex-col gap-4
-                      "
-                    >
+                    <div key={idx} className="animate-entry relative p-6 md:p-8 bg-gradient-to-br from-white/60 via-white/40 to-white/20 backdrop-blur-3xl border border-white/40 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.03)] rounded-2xl flex flex-col gap-4">
                       <div className="flex justify-between items-center border-b border-black/5 pb-3">
                         <div className="flex items-center gap-2">
                           <Quote size={12} className="text-black/30" />
-                          <h3 className="text-editorial-label text-black/60">
-                            {scene.title}
-                          </h3>
+                          <h3 className="text-editorial-label text-black/60">{scene.title}</h3>
                         </div>
-                        <MagneticButton
-                            onClick={() => copyToClipboard(scene.text, `scenario-${idx}`)}
-                            className={`
-                              px-4 py-1.5 rounded-full text-editorial-label border transition-all
-                              ${isCopied(`scenario-${idx}`)
-                                ? 'bg-black text-white border-black' 
-                                : 'bg-white/40 text-gray-600 border-gray-300 hover:border-black hover:text-black'}
-                            `}
-                        >
+                        <MagneticButton onClick={() => copyToClipboard(scene.text, `scenario-${idx}`)} className={`px-4 py-1.5 rounded-full text-editorial-label border transition-all ${isCopied(`scenario-${idx}`) ? 'bg-black text-white border-black' : 'bg-white/40 text-gray-600 border-gray-300 hover:border-black hover:text-black'}`}>
                           {isCopied(`scenario-${idx}`) ? 'Copiado' : 'Copiar'}
                         </MagneticButton>
                       </div>
@@ -347,41 +462,19 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                   ))}
               </div>
             ) : (
-              /* --- STANDARD EDITOR MODE --- */
               <>
-                <div 
-                  className="
-                  animate-entry
-                  relative flex flex-col w-full
-                  min-h-[30vh]
-                  p-6 md:p-14
-                  bg-gradient-to-br from-white/60 via-white/40 to-white/20
-                  backdrop-blur-3xl
-                  border border-white/40 
-                  shadow-[0_20px_40px_-10px_rgba(0,0,0,0.03)]
-                  rounded-2xl md:rounded-3xl
-                  "
-                >
+                <div className="animate-entry relative flex flex-col w-full min-h-[30vh] p-6 md:p-14 bg-gradient-to-br from-white/60 via-white/40 to-white/20 backdrop-blur-3xl border border-white/40 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.03)] rounded-2xl md:rounded-3xl">
                   <div className="absolute inset-0 pointer-events-none opacity-[0.03] mix-blend-multiply rounded-2xl md:rounded-3xl" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'6\' height=\'6\' viewBox=\'0 0 6 6\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'%23000000\' fill-opacity=\'1\' fill-rule=\'evenodd\'%3E%3Cpath d=\'M5 0h1L0 6V5zM6 5v1H5z\'/%3E%3C/g%3E%3C/svg%3E")' }}></div>
                   
                   {template.channel === CommunicationChannel.EMAIL && (
                     <div className="mb-6 md:mb-10 relative z-10 group shrink-0">
                       <div className="flex flex-wrap justify-between items-end mb-2 md:mb-3 border-b border-black/5 pb-2 gap-2">
                         <label className="text-editorial-label text-gray-400">Assunto</label>
-                        <MagneticButton 
-                          onClick={() => copyToClipboard(subject, 'subject')}
-                          className={`flex items-center gap-1.5 text-editorial-label hover:underline transition-colors font-sans ${isCopied('subject') ? 'text-black' : 'text-gray-400 hover:text-black'}`}
-                        >
+                        <MagneticButton onClick={() => copyToClipboard(subject, 'subject')} className={`flex items-center gap-1.5 text-editorial-label hover:underline transition-colors font-sans ${isCopied('subject') ? 'text-black' : 'text-gray-400 hover:text-black'}`}>
                           {isCopied('subject') ? <><Check size={10} strokeWidth={1.5} /><span>Copiado</span></> : <><Copy size={10} strokeWidth={1.5} /><span>Copiar Assunto</span></>}
                         </MagneticButton>
                       </div>
-                      <input
-                        type="text"
-                        value={subject}
-                        onChange={(e) => setSubject(e.target.value)}
-                        className="w-full py-2 bg-transparent border-none focus:ring-0 outline-none text-black font-serif italic text-xl md:text-3xl placeholder:text-gray-400/30 font-light"
-                        placeholder="Insira o assunto..."
-                      />
+                      <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} className="w-full py-2 bg-transparent border-none focus:ring-0 outline-none text-black font-serif italic text-xl md:text-3xl placeholder:text-gray-400/30 font-light" placeholder="Insira o assunto..." />
                     </div>
                   )}
 
@@ -400,25 +493,12 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                 </div>
 
                 {secondaryContent !== '' && (
-                  <div 
-                    className="
-                    animate-entry
-                    relative flex flex-col w-full
-                    min-h-[15rem]
-                    p-6 md:p-14
-                    bg-gradient-to-br from-white/60 via-white/40 to-white/20
-                    backdrop-blur-3xl
-                    border border-white/40 
-                    shadow-[0_20px_40px_-10px_rgba(0,0,0,0.03)]
-                    rounded-2xl md:rounded-3xl
-                  ">
+                  <div className="animate-entry relative flex flex-col w-full min-h-[15rem] p-6 md:p-14 bg-gradient-to-br from-white/60 via-white/40 to-white/20 backdrop-blur-3xl border border-white/40 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.03)] rounded-2xl md:rounded-3xl">
                     <div className="absolute inset-0 pointer-events-none opacity-[0.03] mix-blend-multiply rounded-2xl md:rounded-3xl" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'6\' height=\'6\' viewBox=\'0 0 6 6\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'%23000000\' fill-opacity=\'1\' fill-rule=\'evenodd\'%3E%3Cpath d=\'M5 0h1L0 6V5zM6 5v1H5z\'/%3E%3C/g%3E%3C/svg%3E")' }}></div>
                     <div className="mb-6 md:mb-10 relative z-10 shrink-0">
                       <div className="flex items-center gap-3 border-b border-black/5 pb-2">
                         <div className="w-1.5 h-1.5 bg-black/60 rotate-45"></div>
-                        <label className="text-editorial-label text-gray-500">
-                          {template.secondaryLabel || 'Conteúdo Adicional'}
-                        </label>
+                        <label className="text-editorial-label text-gray-500">{template.secondaryLabel || 'Conteúdo Adicional'}</label>
                       </div>
                     </div>
                     <div className="relative z-10 flex flex-col w-full">
@@ -441,50 +521,21 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
         </div>
       </div>
 
-      {/* FOOTER ACTIONS - With "Glow" and Physics */}
       {!isScenarioMode && (
-        <div 
-          className="animate-entry flex-none bg-gradient-to-t from-white/80 via-white/60 to-white/30 backdrop-blur-xl flex flex-col sm:flex-row sm:justify-end items-stretch sm:items-center gap-3 md:gap-4 border-t border-white/30 z-30"
-          style={{ padding: 'clamp(1rem, 2vw, 2rem)' }}
-        >
+        <div className="animate-entry flex-none bg-gradient-to-t from-white/80 via-white/60 to-white/30 backdrop-blur-xl flex flex-col sm:flex-row sm:justify-end items-stretch sm:items-center gap-3 md:gap-4 border-t border-white/30 z-30" style={{ padding: 'clamp(1rem, 2vw, 2rem)' }}>
           {template.secondaryContent && (
-            <MagneticButton
-              onClick={() => copyToClipboard(secondaryContent, 'secondary')}
-              className={`
-                group relative overflow-hidden flex items-center justify-center gap-2 md:gap-3 px-6 md:px-8 py-3.5 md:py-4 transition-all duration-300 rounded-full border
-                ${isCopied('secondary')
-                  ? 'bg-black text-white border-black shadow-lg' 
-                  : 'bg-white/40 text-gray-600 border-white/50 hover:border-white/80 hover:text-black hover:shadow-[0_0_20px_rgba(255,255,255,0.5)]'}
-              `}
-            >
+            <MagneticButton onClick={() => copyToClipboard(secondaryContent, 'secondary')} className={`group relative overflow-hidden flex items-center justify-center gap-2 md:gap-3 px-6 md:px-8 py-3.5 md:py-4 transition-all duration-300 rounded-full border ${isCopied('secondary') ? 'bg-black text-white border-black shadow-lg' : 'bg-white/40 text-gray-600 border-white/50 hover:border-white/80 hover:text-black hover:shadow-[0_0_20px_rgba(255,255,255,0.5)]'}`}>
               <div className="relative z-10 flex items-center gap-2">
                 {isCopied('secondary') ? <Check size={14} strokeWidth={1} /> : <Copy size={14} strokeWidth={1} />}
-                <span className="text-editorial-label whitespace-nowrap font-sans">
-                  {isCopied('secondary') ? 'Copiado' : `Copiar ${template.secondaryLabel ? 'Protocolo' : 'Secundário'}`}
-                </span>
+                <span className="text-editorial-label whitespace-nowrap font-sans">{isCopied('secondary') ? 'Copiado' : `Copiar ${template.secondaryLabel ? 'Protocolo' : 'Secundário'}`}</span>
               </div>
             </MagneticButton>
           )}
-          
-          <MagneticButton
-            onClick={() => copyToClipboard(content, 'main')}
-            className={`
-              group relative overflow-hidden flex items-center justify-center gap-2 md:gap-3 px-8 md:px-12 py-3.5 md:py-4 transition-all duration-300 rounded-full border
-              ${isCopied('main') 
-                ? 'bg-black text-white border-black shadow-lg' 
-                : 'bg-white/70 text-black border-white/50 hover:bg-white hover:border-white shadow-sm hover:shadow-[0_0_30px_rgba(255,255,255,0.9)]'}
-            `}
-          >
-             {/* Glow Effect Element - Physics based appearance */}
-            <div 
-              className="absolute inset-0 bg-white/60 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-            />
-            
+          <MagneticButton onClick={() => copyToClipboard(content, 'main')} className={`group relative overflow-hidden flex items-center justify-center gap-2 md:gap-3 px-8 md:px-12 py-3.5 md:py-4 transition-all duration-300 rounded-full border ${isCopied('main') ? 'bg-black text-white border-black shadow-lg' : 'bg-white/70 text-black border-white/50 hover:bg-white hover:border-white shadow-sm hover:shadow-[0_0_30px_rgba(255,255,255,0.9)]'}`}>
+             <div className="absolute inset-0 bg-white/60 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             <div className="relative z-10 flex items-center gap-2">
                {isCopied('main') ? <Check size={14} strokeWidth={1} /> : <Copy size={14} strokeWidth={1} />}
-               <span className="text-editorial-label whitespace-nowrap font-sans">
-                 {isCopied('main') ? 'Copiado' : `Copiar ${template.secondaryContent ? 'Email' : 'Texto'}`}
-               </span>
+               <span className="text-editorial-label whitespace-nowrap font-sans">{isCopied('main') ? 'Copiado' : `Copiar ${template.secondaryContent ? 'Email' : 'Texto'}`}</span>
             </div>
           </MagneticButton>
         </div>

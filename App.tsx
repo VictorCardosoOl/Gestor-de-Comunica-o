@@ -1,27 +1,49 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Editor } from './components/Editor';
 import { INITIAL_TEMPLATES, CATEGORIES } from './constants';
 import { Template } from './types';
-import { Menu, Search, X, Loader2, Command, FileText, MessageSquare } from 'lucide-react';
+import { Menu, Search, X, Loader2, Command, FileText, ChevronRight, CornerDownLeft } from 'lucide-react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { useDebounce } from './hooks/useDebounce';
 import { SmoothWrapper } from './components/SmoothWrapper';
 
-// Helper for highlighting text matches
+// --- HELPER: ACCENT INSENSITIVE HIGHLIGHT ---
+const escapeRegExp = (string: string) => {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
+
+const getAccentInsensitiveRegex = (text: string) => {
+   // Mapping for common pt-BR accents to regex groups
+   const accMap: Record<string, string> = {
+     'a': '[aàáâãäå]', 'e': '[eèéêë]', 'i': '[iìíîï]', 'o': '[oòóôõöø]', 'u': '[uùúûü]', 'c': '[cç]', 'n': '[nñ]'
+   };
+   
+   const escaped = escapeRegExp(text);
+   const pattern = escaped.split('').map((char) => {
+      const lower = char.toLowerCase();
+      return accMap[lower] || char;
+   }).join('');
+   
+   return new RegExp(`(${pattern})`, 'gi');
+};
+
 const HighlightedText = ({ text, highlight, className }: { text: string, highlight: string, className?: string }) => {
   if (!highlight.trim()) {
     return <span className={className}>{text}</span>;
   }
-  // Safe regex escape
-  const escapedHighlight = highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const regex = new RegExp(`(${escapedHighlight})`, 'gi');
+
+  const regex = getAccentInsensitiveRegex(highlight.trim());
   const parts = text.split(regex);
+
   return (
     <span className={className}>
       {parts.map((part, i) => 
         regex.test(part) ? (
-          <span key={i} className="bg-yellow-200/60 text-black font-medium rounded-[2px] px-0.5 box-decoration-clone">{part}</span>
+          <span key={i} className="bg-yellow-200/80 text-black font-semibold rounded-[2px] px-0.5 box-decoration-clone shadow-sm">
+            {part}
+          </span>
         ) : (
           part
         )
@@ -35,12 +57,16 @@ const App: React.FC = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
+  // Debounce for the MAIN list filtering (heavy operation)
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
-  const isSearching = searchQuery !== debouncedSearchQuery; // Visual feedback for debounce
+  const isSearching = searchQuery !== debouncedSearchQuery; 
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  
+  // Suggestion state
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
   
   // REFS PARA O SCROLL DO LENIS
   const listWrapperRef = useRef<HTMLDivElement>(null);
@@ -61,16 +87,48 @@ const App: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Keyboard Shortcuts
+  // --- AUTOCOMPLETE SUGGESTIONS LOGIC ---
+  const suggestions = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    
+    const normalize = (str: string) => 
+      str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "";
+    
+    const q = normalize(searchQuery);
+
+    // Filter mainly by Title for suggestions
+    return INITIAL_TEMPLATES
+      .filter(t => normalize(t.title).includes(q))
+      .slice(0, 5); // Limit to top 5
+  }, [searchQuery]);
+
+  // Keyboard Navigation for Suggestions
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         searchInputRef.current?.focus();
       }
+
+      // Dropdown Navigation
+      if (isSearchFocused && suggestions.length > 0) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setActiveSuggestionIndex(prev => (prev < suggestions.length - 1 ? prev + 1 : 0));
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setActiveSuggestionIndex(prev => (prev > 0 ? prev - 1 : suggestions.length - 1));
+        } else if (e.key === 'Enter' && activeSuggestionIndex >= 0) {
+          e.preventDefault();
+          const selected = suggestions[activeSuggestionIndex];
+          handleSuggestionClick(selected);
+        }
+      }
+
       if (e.key === 'Escape') {
         if (document.activeElement === searchInputRef.current) {
            searchInputRef.current?.blur();
+           setIsSearchFocused(false);
         } else if (selectedTemplate) {
            setSelectedTemplate(null);
         }
@@ -78,9 +136,17 @@ const App: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedTemplate]);
+  }, [selectedTemplate, isSearchFocused, suggestions, activeSuggestionIndex]);
 
-  // Robust Search Logic
+  const handleSuggestionClick = (template: Template) => {
+    setSelectedTemplate(template);
+    setSearchQuery(template.title); // Optional: fill bar
+    setIsSearchFocused(false);
+    setActiveSuggestionIndex(-1);
+    searchInputRef.current?.blur();
+  };
+
+  // --- MAIN LIST FILTERING LOGIC ---
   const filteredTemplates = useMemo(() => {
     let filtered = INITIAL_TEMPLATES || [];
     
@@ -218,14 +284,16 @@ const App: React.FC = () => {
               </div>
 
               {/* Enhanced Search Bar */}
-              <div className="px-6 pb-6 shrink-0 z-20">
+              <div className="px-6 pb-6 shrink-0 z-30 relative">
                 <motion.div 
                   layout
                   className={`
-                    relative group flex items-center w-full rounded-2xl transition-all duration-300 ease-out overflow-hidden
+                    relative group flex items-center w-full rounded-2xl transition-all duration-300 ease-out
                     ${isSearchFocused 
-                      ? 'bg-white/90 backdrop-blur-xl shadow-[0_8px_40px_-10px_rgba(0,0,0,0.15)] ring-1 ring-black/10 scale-[1.01]' 
+                      ? 'bg-white/95 backdrop-blur-xl shadow-[0_8px_40px_-10px_rgba(0,0,0,0.15)] ring-1 ring-black/10 scale-[1.01]' 
                       : 'bg-white/40 backdrop-blur-md border border-white/40 hover:bg-white/60 hover:border-white/50 shadow-sm'}
+                    /* Rounded corners fix for dropdown */
+                    ${suggestions.length > 0 && isSearchFocused ? 'rounded-b-none' : ''}
                   `}
                 >
                   <div className={`pl-4 transition-colors duration-300 ${isSearchFocused ? 'text-black' : 'text-gray-400'}`}>
@@ -240,8 +308,14 @@ const App: React.FC = () => {
                     type="text"
                     placeholder="Buscar (⌘K)"
                     value={searchQuery}
-                    onFocus={() => setIsSearchFocused(true)}
-                    onBlur={() => setIsSearchFocused(false)}
+                    onFocus={() => {
+                      setIsSearchFocused(true);
+                      setActiveSuggestionIndex(-1);
+                    }}
+                    onBlur={() => {
+                      // Small timeout to allow click on dropdown items to register
+                      setTimeout(() => setIsSearchFocused(false), 200);
+                    }}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-3 pr-10 py-3.5 bg-transparent border-none focus:ring-0 outline-none text-[#111] placeholder:text-gray-500/50 text-sm font-sans tracking-wide"
                   />
@@ -277,6 +351,47 @@ const App: React.FC = () => {
                      </AnimatePresence>
                   </div>
                 </motion.div>
+
+                {/* --- AUTOCOMPLETE DROPDOWN --- */}
+                <AnimatePresence>
+                  {isSearchFocused && suggestions.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10, scaleY: 0.9 }}
+                      animate={{ opacity: 1, y: 0, scaleY: 1 }}
+                      exit={{ opacity: 0, y: -10, transition: { duration: 0.15 } }}
+                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                      className="absolute left-6 right-6 top-[calc(100%-24px)] pt-3 pb-2 bg-white/95 backdrop-blur-xl border-x border-b border-white/50 shadow-2xl rounded-b-2xl z-40 overflow-hidden origin-top"
+                    >
+                      <div className="flex flex-col">
+                        <div className="px-4 py-1.5 flex justify-between items-center text-[10px] text-gray-400 font-medium uppercase tracking-wider">
+                          <span>Sugestões</span>
+                          <span className="flex items-center gap-1">
+                            Use <CornerDownLeft size={10} /> para selecionar
+                          </span>
+                        </div>
+                        {suggestions.map((sug, idx) => (
+                          <button
+                            key={sug.id}
+                            className={`
+                              text-left px-4 py-2.5 flex items-center justify-between group
+                              transition-colors duration-200
+                              ${idx === activeSuggestionIndex ? 'bg-black/5 text-black' : 'hover:bg-black/5 text-gray-700'}
+                            `}
+                            onClick={() => handleSuggestionClick(sug)}
+                            onMouseEnter={() => setActiveSuggestionIndex(idx)}
+                          >
+                            <span className="truncate text-sm font-sans">
+                              <HighlightedText text={sug.title} highlight={searchQuery} />
+                            </span>
+                            {idx === activeSuggestionIndex && (
+                              <ChevronRight size={14} className="text-black/40" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               {/* Template List */}

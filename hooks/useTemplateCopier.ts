@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 
 interface UseTemplateCopierReturn {
@@ -21,8 +22,9 @@ export const useTemplateCopier = (): UseTemplateCopierReturn => {
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
+        .replace(/\t/g, "&nbsp;&nbsp;&nbsp;&nbsp;") // Convert tabs to non-breaking spaces for email indentation
         .replace(/\n/g, "<br>")
-        .replace(/\*(.*?)\*/g, "<b>$1</b>") // Bold markdown-like syntax
+        .replace(/\*([\s\S]*?)\*/g, "<b>$1</b>") // Bold markdown-like syntax (multiline supported)
         .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2">$1</a>'); // Link syntax
 
       const fullHtml = `

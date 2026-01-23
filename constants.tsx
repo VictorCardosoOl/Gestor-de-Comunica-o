@@ -1,3 +1,4 @@
+
 import { Category, CommunicationChannel, Template } from './types';
 
 export const CATEGORIES: Category[] = [
@@ -460,7 +461,7 @@ A/C: [Nome do Cliente]
 
 [Saudação] Sr(a). [Nome do Cliente],
 
-Espero que esteja bem.
+Espero que estejam bem.
 
 Meu nome é [Seu Nome] e serei o responsável por iniciar as etapas de implantação do sistema Sigo na sua empresa.
 
@@ -507,7 +508,7 @@ Atenciosamente,`
     description: 'E-mail de formalização das horas e conteúdos ministrados durante a implantação.',
     content: `[Saudação], Sra. [Nome do Cliente]!
 
-Espero que esteja bem!
+Espero que estejam bem!
 
 Gostaria de compartilhar um resumo do nosso treinamento. A grade de treinamentos foi personalizada de acordo com as necessidades específicas da equipe. Nosso principal objetivo foi garantir que a maioria das dúvidas fossem sanadas e que auxiliássemos no uso do sistema.
 
@@ -542,45 +543,42 @@ Reforço ainda meu compromisso contínuo com a [Empresa]. Por favor, não hesite
   // --- MÓDULO: AGENDAMENTO ---
   {
     id: 'agendamento-fase1-protocolo',
-    title: 'Agendamento + Protocolo (Fase 1)',
+    title: 'Agendamento + Protocolo (Fase Variável)',
     category: 'scheduling',
     channel: CommunicationChannel.EMAIL,
-    subject: '[Empresa] | Treinamento Online do Software Sigo (Fase 1)',
-    description: 'Modelo duplo: E-mail para o cliente e Protocolo Interno (Task) para o consultor.',
-    content: `[Empresa] | Treinamento Online do Software Sigo (Fase 1)
+    subject: '[Nome da Empresa] | Treinamento Online do Software Sigo (Fase [Fase])',
+    description: 'Modelo ajustável para agendamento de treinamento e criação de protocolo interno.',
+    content: `Prezados, [Saudação]!
 
-[Saudação],
+Espero que estejam bem.
 
-Espero que estejam bem. 
+Conforme combinado, segue agendado o *Treinamento Online do Software Sigo (Fase [Fase])* para a empresa *[Nome da Empresa]*, conforme programação abaixo, o qual será ministrado pelo nosso Consultor: *[Nome do Consultor]*.
 
-Conforme combinado, segue agendado o Treinamento Online do Software Sigo (Fase 1) para a empresa [Empresa], conforme programação abaixo, o qual será ministrado pelo nosso Consultor: [Nome do Consultor].
+O treinamento será realizado através da plataforma Google Meet, pelo o seguinte link:
+[Link da Reunião]
 
-O treinamento será realizado através da plataforma Google Meet, pelo o seguinte link: [Link da Reunião]
+\t*[Data] » [Horário Início] às [Horário Fim] – Duração [Duração]*
 
-[Data] » [Horário Início] às [Horário Fim] – Duração 03h00 
-                                                                                                                                   
-• Configurações e Cadastros 
-• Cadastros e Utilitários  
+\t*[Módulos]*
 
 No anexo seguem os seguintes documentos:
 
-• Fase 1 - Cronograma de Treinamento Sigo
-Refere-se ao Cronograma com o conteúdo que será ministrado pelo nosso Consultor, com a recomendação dos departamentos de sua empresa que deverão ser envolvidos na capacitação.
+\t*• Fase [Fase] - Cronograma de Treinamento Sigo*
+\tRefere-se ao Cronograma com o conteúdo que será ministrado pelo nosso Consultor, com a recomendação dos departamentos de sua empresa que deverão ser envolvidos na capacitação.
 
-• Ordem de Serviço nº [Número OS] - A - Sigo
-Após conclusão do treinamento, peço gentilmente que imprima, preencha e me devolva essa Ordem de Serviço digitalizada, por e-mail.
+\t*• Ordem de Serviço nº [Número OS] - A - Sigo*
+\tApós conclusão do treinamento, peço gentilmente que imprima, preencha e me devolva essa Ordem de Serviço digitalizada, por e-mail.
 
-• Requisição de Dados para Cadastro - Fase 1 - Treinamento Sigo
-Refere-se aos dados importantes de serem reservados para serem utilizados no momento do treinamento.`,
+\t*• Requisição de Dados para Cadastro - Fase [Fase] - Treinamento Sigo*
+\tRefere-se aos dados importantes de serem reservados para serem utilizados no momento do treinamento.`,
     secondaryLabel: 'Protocolo Interno (W-GSC)',
-    secondaryContent: `Olá, [Nome do Consultor],
+    secondaryContent: `Olá, Prezados,
  
-Para sua ciência e providência, foi criado no W-GSC uma Tarefa para o senhor ministrar o Treinamento Online do sistema Sigo para a empresa [Empresa] (Fase 1), conforme programação abaixo:
+Para ciência e providências, informamos que foi criada no W-GSC uma tarefa para que seja ministrado o Treinamento Online do sistema Sigo à empresa *[Nome da Empresa]* (Fase [Fase]), conforme programação abaixo:
  
-[Data] » [Horário Início] às [Horário Fim] – Duração 03h00 
-                                                                                                                                   
-• Configurações e Cadastros 
-• Cadastros e Utilitários  
+\t*[Data] » [Horário Início] às [Horário Fim] – Duração [Duração]* 
+
+\t*[Módulos]*
  
 O treinamento será realizado através da plataforma Google Meet, pelo o seguinte link: 
 
