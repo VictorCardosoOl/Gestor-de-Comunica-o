@@ -661,7 +661,13 @@ O colaborador demonstrou baixo engajamento no esclarecimento das dúvidas do cli
 O colaborador recebeu feedback negativo da cliente [Nome Cliente Negativo], da empresa [Empresa], relacionado à ausência de retorno durante o atendimento. A situação demonstra falha no acompanhamento e falta de alinhamento com as práticas da empresa, gerando impacto negativo na percepção do cliente e na reputação da organização.
 
 [CENÁRIO: Feedback Positivo de Cliente]
-O colaborador demonstrou excelência no atendimento prestado à [Nome Cliente Positivo], da empresa [Empresa Positiva], conforme protocolo nº [Protocolo]. O registro evidencia cordialidade, clareza nas orientações e eficiência na resolução da demanda, reforçando o alinhamento com os padrões de qualidade do atendimento ao cliente.`
+O colaborador demonstrou excelência no atendimento prestado à [Nome Cliente Positivo], da empresa [Empresa Positiva], conforme protocolo nº [Protocolo]. O registro evidencia cordialidade, clareza nas orientações e eficiência na resolução da demanda, reforçando o alinhamento com os padrões de qualidade do atendimento ao cliente.
+
+[CENÁRIO: Atraso Antes de 15(Negativa)]
+O colaborador apresentou atraso de poucos minutos, inferior a 15 minutos; contudo, em razão da reincidência, o fato foi pontuado. Ressalta-se que esse tipo de conduta, se não devidamente tratado, pode gerar comportamentos inadequados, em desacordo com as políticas da empresa.
+
+[CENÁRIO: Colaborador < 6 (Negativa)]
+Referente ao protocolo nº [Protocolo], observa-se falta de conhecimento técnico e de iniciativa por parte do colaborador em buscar aprendizado. Ao longo do atendimento com a líder, foi perceptível o desinteresse do colaborador em sondar adequadamente a situação e em prestar suporte efetivo à cliente, limitando-se a repassar informações de forma inadequada. Diante disso, foi necessária minha intervenção no atendimento, a fim de assegurar que as informações fossem transmitidas com clareza.`
   },
   {
     id: 'aviso-atraso',
