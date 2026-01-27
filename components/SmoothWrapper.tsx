@@ -1,4 +1,3 @@
-
 import React, { useEffect, useLayoutEffect, useRef } from 'react';
 import Lenis from '@studio-freight/lenis';
 import gsap from 'gsap';
@@ -35,13 +34,13 @@ export const SmoothWrapper: React.FC<SmoothWrapperProps> = ({
 
     // 2. Initialize Lenis
     const lenis = new Lenis({
-      duration: 1.2,
+      duration: 1.0, // Reduced from 1.2 for faster feel
       easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), // Exponential easing
       direction: 'vertical',
       gestureDirection: 'vertical',
       smooth: true,
       mouseMultiplier: 1,
-      smoothTouch: false,
+      smoothTouch: false, // Disabled on touch to prevent gesture conflicts
       touchMultiplier: 2,
       // @ts-ignore
       wrapper: targetWrapper,

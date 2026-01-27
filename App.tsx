@@ -29,12 +29,13 @@ const getAccentInsensitiveRegex = (text: string) => {
    return new RegExp(`(${pattern})`, 'gi');
 };
 
-const HighlightedText = ({ text, highlight, className }: { text: string, highlight: string, className?: string }) => {
+// Optimized with Memo to prevent re-rendering entire lists on selection changes
+const HighlightedText = React.memo(({ text, highlight, className }: { text: string, highlight: string, className?: string }) => {
   if (!highlight.trim()) {
     return <span className={className}>{text}</span>;
   }
 
-  const regex = getAccentInsensitiveRegex(highlight.trim());
+  const regex = useMemo(() => getAccentInsensitiveRegex(highlight.trim()), [highlight]);
   const parts = text.split(regex);
 
   return (
@@ -50,7 +51,7 @@ const HighlightedText = ({ text, highlight, className }: { text: string, highlig
       )}
     </span>
   );
-};
+});
 
 const App: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -210,7 +211,7 @@ const App: React.FC = () => {
     initial: { opacity: 0, x: 40, scale: 0.98 },
     animate: { 
       opacity: 1, x: 0, scale: 1,
-      transition: { type: "spring", stiffness: 350, damping: 25, mass: 1 } // Mais rápido
+      transition: { type: "spring", stiffness: 300, damping: 28, mass: 1 } // Suavizado
     },
     exit: { opacity: 0, x: 20, transition: { duration: 0.2, ease: "easeInOut" } }
   };
@@ -219,11 +220,11 @@ const App: React.FC = () => {
     initial: { y: '100%' },
     animate: { 
       y: 0,
-      transition: { type: "spring", damping: 30, stiffness: 350 } // Mais rápido
+      transition: { type: "spring", damping: 30, stiffness: 300 } // Suavizado
     },
     exit: { 
       y: '100%',
-      transition: { type: "spring", damping: 30, stiffness: 350 }
+      transition: { type: "spring", damping: 30, stiffness: 300 }
     }
   };
 
@@ -293,7 +294,7 @@ const App: React.FC = () => {
                 lg:rounded-3xl
                 overflow-hidden
               `}
-              transition={{ type: "spring", stiffness: 300, damping: 25, mass: 1 }} // Mais rápido
+              transition={{ type: "spring", stiffness: 280, damping: 25 }} // Ajuste para suavidade
             >
                <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay rounded-3xl" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }}></div>
 
@@ -304,7 +305,7 @@ const App: React.FC = () => {
                   key={currentCategoryName}
                   initial={{ opacity: 0, y: 10, filter: 'blur(5px)' }}
                   animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                  transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} // Mais rápido
+                  transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} 
                 >
                   <div className="flex flex-col gap-1">
                     <span className="text-editorial-label text-gray-500 pl-1">
@@ -484,16 +485,16 @@ const App: React.FC = () => {
 
                           return (
                           <motion.button
-                            layout="position"
+                            // Removed layout="position" to prevent heavy recalculations on list
                             key={template.id}
-                            initial={{ opacity: 0, y: 20 }}
+                            initial={{ opacity: 0, y: 15 }}
                             animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            whileHover={{ scale: 1.01, backgroundColor: 'rgba(255,255,255,0.6)' }}
-                            whileTap={{ scale: 0.98 }}
+                            exit={{ opacity: 0, scale: 0.98 }}
+                            whileHover={{ scale: 1.005, backgroundColor: 'rgba(255,255,255,0.7)' }}
+                            whileTap={{ scale: 0.99 }}
                             transition={{ 
-                              delay: index * 0.02, // Mais rápido
-                              type: "spring", stiffness: 150, damping: 18 // Mais rápido
+                              delay: index * 0.03,
+                              type: "spring", stiffness: 200, damping: 25 // Smoother
                             }}
                             onClick={() => setSelectedTemplate(template)}
                             className={`

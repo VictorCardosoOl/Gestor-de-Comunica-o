@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
 import { Template, CommunicationChannel } from '../types';
 import { Copy, RefreshCw, Check, MoveLeft, Sparkles, SlidersHorizontal, Loader2, Quote, X, Calendar, Clock, AlignLeft } from 'lucide-react';
 import { refineText } from '../services/geminiService';
@@ -16,42 +16,94 @@ interface Scenario {
   text: string;
 }
 
-// Framer Motion Variants - AJUSTADO PARA VELOCIDADE MAIOR
+// Variants otimizados - Removido stagger excessivo
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.05, // Reduzido de 0.1
-      delayChildren: 0.05, // Reduzido de 0.1
+      duration: 0.3,
       when: "beforeChildren"
     }
   },
   exit: {
     opacity: 0,
-    transition: { duration: 0.15 } // Reduzido de 0.2
+    transition: { duration: 0.15 }
   }
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 15 }, // Reduzido deslocamento inicial de 20
+  hidden: { opacity: 0, y: 10 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { type: "spring", stiffness: 450, damping: 25 } // Mais rígido e rápido (antes 300/24)
+    transition: { type: "spring", stiffness: 500, damping: 30 }
   }
 };
 
-export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
-  const [subject, setSubject] = useState(template.subject || '');
-  
-  // rawContent holds the template WITH placeholders.
-  const [rawContent, setRawContent] = useState(template.content);
-  const [rawSecondaryContent, setRawSecondaryContent] = useState(template.secondaryContent || '');
+// Helpers moved outside component to avoid recreation
+const getInputType = (placeholder: string) => {
+  const lower = placeholder.toLowerCase();
+  if (lower.includes('data')) return 'date';
+  if (lower.includes('horário') || lower.includes('inicio') || lower.includes('fim')) return 'time';
+  if (lower.includes('módulos') || lower.includes('conteúdo') || lower.includes('lista')) return 'textarea';
+  return 'text';
+};
 
-  // content holds the displayed text (Values replacing Placeholders)
-  const [content, setContent] = useState(template.content);
-  const [secondaryContent, setSecondaryContent] = useState(template.secondaryContent || '');
+const formatValueForText = (value: string, type: string) => {
+  if (!value) return '';
+  if (type === 'date') {
+    const parts = value.split('-');
+    if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return value;
+};
+
+const getGreeting = () => {
+  const date = new Date();
+  const hour = date.getHours();
+  const minutes = date.getMinutes();
+  const totalMinutes = hour * 60 + minutes;
+  if (totalMinutes >= 420 && totalMinutes <= 720) return 'bom dia';
+  if (totalMinutes > 720 && totalMinutes <= 1080) return 'boa tarde';
+  return 'boa noite';
+};
+
+const getFormattedToday = () => {
+  const date = new Date();
+  return new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' }).format(date);
+};
+
+const getFormattedNextBusinessDay = () => {
+  const date = new Date();
+  const currentDay = date.getDay();
+  let daysToAdd = 1;
+  if (currentDay === 5) daysToAdd = 3;
+  else if (currentDay === 6) daysToAdd = 2;
+  date.setDate(date.getDate() + daysToAdd);
+  const str = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(date);
+  return str.charAt(0).toUpperCase() + str.slice(1);
+};
+
+// Static processor separated
+const processStaticTags = (text: string) => {
+  if (!text) return '';
+  let processed = text;
+  if (processed.includes('[Saudação]')) processed = processed.replace(/\[Saudação\]/g, getGreeting());
+  if (processed.includes('[Data Hoje]')) processed = processed.replace(/\[Data Hoje\]/g, getFormattedToday());
+  if (processed.includes('[Data Extenso]')) processed = processed.replace(/\[Data Extenso\]/g, getFormattedNextBusinessDay());
+  return processed;
+};
+
+export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
+  // Lazy initialization for performance - runs only once on mount
+  const [subject, setSubject] = useState(() => processStaticTags(template.subject || ''));
+  
+  const [rawContent, setRawContent] = useState(() => processStaticTags(template.content));
+  const [rawSecondaryContent, setRawSecondaryContent] = useState(() => processStaticTags(template.secondaryContent || ''));
+
+  const [content, setContent] = useState(() => processStaticTags(template.content));
+  const [secondaryContent, setSecondaryContent] = useState(() => processStaticTags(template.secondaryContent || ''));
 
   const [variableValues, setVariableValues] = useState<Record<string, string>>({});
   const [showVariables, setShowVariables] = useState(true);
@@ -62,24 +114,63 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
   const secondaryTextareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const isScenarioMode = useMemo(() => template.content.includes('[CENÁRIO:'), [template]);
+  const isScenarioMode = useMemo(() => template.content.includes('[CENÁRIO:'), [template.content]);
 
-  // --- HELPER FUNCTIONS ---
-  const getInputType = (placeholder: string) => {
-    const lower = placeholder.toLowerCase();
-    if (lower.includes('data')) return 'date';
-    if (lower.includes('horário') || lower.includes('inicio') || lower.includes('fim')) return 'time';
-    if (lower.includes('módulos') || lower.includes('conteúdo') || lower.includes('lista')) return 'textarea';
-    return 'text';
-  };
+  const placeholders = useMemo(() => {
+    const regex = /\[(.*?)\]/g;
+    const allText = `${template.subject || ''} ${template.content} ${template.secondaryContent || ''} ${template.tertiaryContent || ''}`;
+    const found = allText.match(regex);
+    if (!found) return [];
+    const unique = Array.from(new Set(found));
+    return unique.filter(p => 
+      !p.includes('Saudação') && 
+      !p.includes('Data Hoje') && 
+      !p.includes('Data Extenso') &&
+      !p.includes('CENÁRIO') 
+    );
+  }, [template]); // Dependency on template object reference is mostly fine
 
-  const formatValueForText = (value: string, type: string) => {
-    if (!value) return '';
-    if (type === 'date') {
-      const parts = value.split('-');
-      if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
-    }
-    return value;
+  // Effect to update state if template prop changes (e.g. navigation while open)
+  // This is kept separate from initialization to avoid double-render on first mount
+  useEffect(() => {
+    setSubject(processStaticTags(template.subject || ''));
+    
+    const pContent = processStaticTags(template.content);
+    const pSecondary = processStaticTags(template.secondaryContent || '');
+
+    setRawContent(pContent);
+    setRawSecondaryContent(pSecondary);
+    setContent(pContent);
+    setSecondaryContent(pSecondary);
+    setVariableValues({});
+  }, [template.id]); // Only re-run if ID changes
+
+  // Optimized Textarea Auto-height
+  const adjustTextareaHeight = useCallback((element: HTMLTextAreaElement | null) => {
+    if (!element) return;
+    requestAnimationFrame(() => {
+      element.style.height = 'auto';
+      element.style.height = `${element.scrollHeight}px`;
+    });
+  }, []);
+
+  // useLayoutEffect prevents visual jitter on initial render
+  useLayoutEffect(() => {
+    adjustTextareaHeight(mainTextareaRef.current);
+    adjustTextareaHeight(secondaryTextareaRef.current);
+  }, [content, secondaryContent, isScenarioMode, template.id, adjustTextareaHeight]);
+
+  const generateContentFromRaw = (baseText: string, values: Record<string, string>) => {
+    let result = baseText;
+    placeholders.forEach(ph => {
+      const type = getInputType(ph);
+      const rawVal = values[ph] || ''; 
+      if (rawVal) {
+        const formattedVal = formatValueForText(rawVal, type);
+        result = result.split(ph).join(formattedVal);
+      }
+    });
+    return result;
   };
 
   const calculateDuration = (start: string, end: string) => {
@@ -99,102 +190,6 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
   const generateOSFromDate = (dateStr: string) => {
     if (!dateStr) return '';
     return dateStr.replace(/-/g, '');
-  };
-
-  const getGreeting = () => {
-    const date = new Date();
-    const hour = date.getHours();
-    const minutes = date.getMinutes();
-    const totalMinutes = hour * 60 + minutes;
-    if (totalMinutes >= 420 && totalMinutes <= 720) return 'bom dia';
-    if (totalMinutes > 720 && totalMinutes <= 1080) return 'boa tarde';
-    return 'boa noite';
-  };
-
-  const getFormattedToday = () => {
-    const date = new Date();
-    return new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' }).format(date);
-  };
-
-  const getFormattedNextBusinessDay = () => {
-    const date = new Date();
-    const currentDay = date.getDay();
-    let daysToAdd = 1;
-    if (currentDay === 5) daysToAdd = 3;
-    else if (currentDay === 6) daysToAdd = 2;
-    date.setDate(date.getDate() + daysToAdd);
-    const str = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(date);
-    return str.charAt(0).toUpperCase() + str.slice(1);
-  };
-
-  // --- PRE-PROCESSING ---
-  const processStaticTags = useCallback((text: string) => {
-    if (!text) return '';
-    let processed = text;
-    if (processed.includes('[Saudação]')) processed = processed.replace(/\[Saudação\]/g, getGreeting());
-    if (processed.includes('[Data Hoje]')) processed = processed.replace(/\[Data Hoje\]/g, getFormattedToday());
-    if (processed.includes('[Data Extenso]')) processed = processed.replace(/\[Data Extenso\]/g, getFormattedNextBusinessDay());
-    return processed;
-  }, []);
-
-  // Initialize
-  useEffect(() => {
-    setSubject(template.subject || '');
-    
-    const processedContent = processStaticTags(template.content);
-    const processedSecondary = processStaticTags(template.secondaryContent || '');
-
-    setRawContent(processedContent);
-    setRawSecondaryContent(processedSecondary);
-    
-    setContent(processedContent);
-    setSecondaryContent(processedSecondary);
-    
-    setVariableValues({});
-  }, [template, processStaticTags]);
-
-  // Adjust textareas
-  const adjustTextareaHeight = (element: HTMLTextAreaElement | null) => {
-    if (element) {
-      element.style.height = 'auto';
-      element.style.height = element.scrollHeight + 'px';
-    }
-  };
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      adjustTextareaHeight(mainTextareaRef.current);
-      adjustTextareaHeight(secondaryTextareaRef.current);
-    }, 10);
-    return () => clearTimeout(timer);
-  }, [content, secondaryContent, isScenarioMode, template.id]);
-
-  const placeholders = useMemo(() => {
-    const regex = /\[(.*?)\]/g;
-    const allText = `${template.subject || ''} ${template.content} ${template.secondaryContent || ''} ${template.tertiaryContent || ''}`;
-    const found = allText.match(regex);
-    if (!found) return [];
-    const unique = Array.from(new Set(found));
-    return unique.filter(p => 
-      !p.includes('Saudação') && 
-      !p.includes('Data Hoje') && 
-      !p.includes('Data Extenso') &&
-      !p.includes('CENÁRIO') 
-    );
-  }, [template]);
-
-  // --- CORE REPLACEMENT LOGIC ---
-  const generateContentFromRaw = (baseText: string, values: Record<string, string>) => {
-    let result = baseText;
-    placeholders.forEach(ph => {
-      const type = getInputType(ph);
-      const rawVal = values[ph] || ''; 
-      if (rawVal) {
-        const formattedVal = formatValueForText(rawVal, type);
-        result = result.split(ph).join(formattedVal);
-      }
-    });
-    return result;
   };
 
   const handleVariableChange = (placeholder: string, inputValue: string) => {
@@ -224,14 +219,13 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
 
   const handleReset = () => {
     if (window.confirm('Restaurar texto original?')) {
-      const processedContent = processStaticTags(template.content);
-      const processedSecondary = processStaticTags(template.secondaryContent || '');
+      const pContent = processStaticTags(template.content);
+      const pSecondary = processStaticTags(template.secondaryContent || '');
       
-      setRawContent(processedContent);
-      setRawSecondaryContent(processedSecondary);
-      
-      setContent(processedContent);
-      setSecondaryContent(processedSecondary);
+      setRawContent(pContent);
+      setRawSecondaryContent(pSecondary);
+      setContent(pContent);
+      setSecondaryContent(pSecondary);
       setSubject(template.subject || '');
       setVariableValues({});
     }
@@ -359,6 +353,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                   <Sparkles size={12} strokeWidth={0.75} />
                   <span className="text-editorial-label font-sans">Preenchimento Automático</span>
                 </div>
+                {/* PERFORMANCE FIX: Removed itemVariants from individual items to prevent massive stagger calculation */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-12 gap-y-8 md:gap-y-10">
                   {placeholders.map((placeholder) => {
                     const inputType = getInputType(placeholder);
@@ -416,7 +411,10 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                   {scenarios.map((scene, idx) => (
                     <motion.div 
                       key={idx} 
-                      variants={itemVariants}
+                      // Removed variants here to speed up large list rendering
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 + (idx * 0.05), duration: 0.3 }}
                       className="relative p-6 md:p-8 bg-gradient-to-br from-white/60 via-white/40 to-white/20 backdrop-blur-3xl border border-white/40 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.03)] rounded-2xl flex flex-col gap-4"
                     >
                       <div className="flex justify-between items-center border-b border-black/5 pb-3">
