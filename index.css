@@ -1,33 +1,45 @@
-
 :root {
+  /* Fonts */
   --font-serif: 'Cormorant Garamond', serif;
   --font-sans: 'Inter', sans-serif;
+
+  /* Theme Colors */
+  --color-bg-base: #f0f0f2;
+  --color-text-primary: #111111;
+  --color-text-secondary: #2a2a2a;
+  
+  /* Gradient Ambient */
+  --grad-1: rgba(255, 255, 255, 0.7);
+  --grad-2: rgba(225, 228, 235, 0.5);
+  --grad-3: rgba(215, 218, 225, 0.4);
+  --grad-4: rgba(235, 238, 242, 0.6);
 }
 
 html, body {
   height: 100%;
   width: 100%;
-  overflow: hidden; /* Mantém a aplicação como "App-like" */
-  overscroll-behavior: none; /* Prevents bounce on Mac/iOS outside the scroll areas */
+  overflow: hidden; /* App-like structure */
+  overscroll-behavior: none;
 }
 
 body {
   font-family: var(--font-sans);
-  background-color: #f0f0f2; /* Base ligeiramente mais fria */
-  color: #111111;
+  background-color: var(--color-bg-base);
+  color: var(--color-text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* Gradiente ambiente ultra-suave para refração estilo vidro */
+  
+  /* Centralized Background Gradient */
   background-image: 
-    radial-gradient(at 10% 10%, rgba(255, 255, 255, 0.7) 0px, transparent 60%),
-    radial-gradient(at 90% 10%, rgba(225, 228, 235, 0.5) 0px, transparent 50%),
-    radial-gradient(at 90% 90%, rgba(215, 218, 225, 0.4) 0px, transparent 50%),
-    radial-gradient(at 10% 90%, rgba(235, 238, 242, 0.6) 0px, transparent 50%);
+    radial-gradient(at 10% 10%, var(--grad-1) 0px, transparent 60%),
+    radial-gradient(at 90% 10%, var(--grad-2) 0px, transparent 50%),
+    radial-gradient(at 90% 90%, var(--grad-3) 0px, transparent 50%),
+    radial-gradient(at 10% 90%, var(--grad-4) 0px, transparent 50%);
   background-attachment: fixed;
   background-size: cover;
 }
 
-/* Scrollbar Editorial - Minimalista */
+/* Scrollbar Editorial - Minimalist */
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: rgba(0,0,0,0.1) transparent;
@@ -48,7 +60,7 @@ body {
   background: rgba(0,0,0,0.25); 
 }
 
-/* Utilitários de Tipografia Refinada & Responsiva */
+/* Typography Utilities */
 .font-serif { font-family: var(--font-serif); }
 .font-sans { font-family: var(--font-sans); }
 
@@ -76,7 +88,7 @@ body {
   letter-spacing: 0.01em;
   line-height: 1.65;
   font-size: clamp(0.95rem, 1vw, 1.05rem);
-  color: #2a2a2a;
+  color: var(--color-text-secondary);
 }
 
 ::selection {
