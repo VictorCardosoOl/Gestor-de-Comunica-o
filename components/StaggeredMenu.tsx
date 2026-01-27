@@ -83,41 +83,41 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
 
     const tl = gsap.timeline({ paused: true });
 
-    // 1. Wipe Layers
+    // 1. Wipe Layers (FASTER)
     layers.forEach((el, i) => {
-      tl.to(el, { xPercent: 0, duration: 0.6, ease: 'power4.inOut' }, i * 0.05);
+      tl.to(el, { xPercent: 0, duration: 0.4, ease: 'power4.inOut' }, i * 0.04);
     });
 
-    // 2. Panel Entry
-    const panelStart = layers.length * 0.05 + 0.1;
-    tl.to(panel, { xPercent: 0, duration: 0.8, ease: 'power4.out' }, panelStart);
+    // 2. Panel Entry (FASTER)
+    const panelStart = layers.length * 0.04;
+    tl.to(panel, { xPercent: 0, duration: 0.5, ease: 'power4.out' }, panelStart);
 
-    // 3. Items Stagger
-    const contentStart = panelStart + 0.3;
+    // 3. Items Stagger (FASTER)
+    const contentStart = panelStart + 0.2;
     if (itemEls.length) {
       tl.to(itemEls, {
         yPercent: 0,
         rotate: 0,
-        duration: 1,
+        duration: 0.6,
         ease: 'power3.out',
-        stagger: 0.05
+        stagger: 0.03
       }, contentStart);
 
       tl.to(numberEls, {
         '--sm-num-opacity': 1,
-        duration: 0.5,
-        stagger: 0.05
-      }, contentStart + 0.1);
+        duration: 0.4,
+        stagger: 0.03
+      }, contentStart + 0.05);
     }
 
-    // 4. Socials
+    // 4. Socials (FASTER)
     if (socialLinks.length) {
        tl.to([socialTitle, ...socialLinks], {
          y: 0,
          opacity: 1,
-         duration: 0.6,
-         stagger: 0.05
-       }, contentStart + 0.3);
+         duration: 0.5,
+         stagger: 0.03
+       }, contentStart + 0.2);
     }
 
     openTlRef.current = tl;
@@ -142,7 +142,7 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
         gsap.set(inner, { yPercent: 0 });
         gsap.to(inner, {
             yPercent: -66.6, // Move up 2 lines
-            duration: 0.8,
+            duration: 0.6, // Faster text swap
             ease: 'expo.inOut'
         });
     }
@@ -151,7 +151,7 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
     if (iconRef.current) {
         gsap.to(iconRef.current, {
             rotate: willOpen ? 135 : 0,
-            duration: 0.6,
+            duration: 0.4,
             ease: 'back.out(1.7)'
         });
     }
@@ -161,7 +161,7 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
         const tl = buildOpenTimeline();
         tl?.play();
     } else {
-        // Close Sequence
+        // Close Sequence (FASTER)
         openTlRef.current?.kill();
         const panel = panelRef.current;
         const layers = gsap.utils.toArray('.sm-prelayer') as HTMLElement[];
@@ -169,7 +169,7 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
         if (panel) {
             closeTweenRef.current = gsap.to([panel, ...layers], {
                 xPercent: 100,
-                duration: 0.5,
+                duration: 0.4,
                 ease: 'power3.inOut',
                 stagger: { amount: 0.1, from: "end" } // Reverse order
             });

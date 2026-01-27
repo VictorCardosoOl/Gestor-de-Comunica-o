@@ -70,22 +70,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
     mobileClosed: { 
       x: "-100%", 
       width: "18rem", 
-      transition: { type: "spring", stiffness: 300, damping: 35, mass: 1 }
+      transition: { type: "spring", stiffness: 350, damping: 30, mass: 1 }
     },
     mobileOpen: { 
       x: "0%", 
       width: "18rem",
-      transition: { type: "spring", stiffness: 300, damping: 35, mass: 1 }
+      transition: { type: "spring", stiffness: 350, damping: 30, mass: 1 }
     },
     desktopCollapsed: { 
       x: "0%", 
       width: "5.5rem",
-      transition: { type: "spring", stiffness: 200, damping: 30, mass: 1 }
+      transition: { type: "spring", stiffness: 300, damping: 25, mass: 1 }
     },
     desktopExpanded: { 
       x: "0%", 
       width: "18rem",
-      transition: { type: "spring", stiffness: 200, damping: 30, mass: 1 }
+      transition: { type: "spring", stiffness: 300, damping: 25, mass: 1 }
     }
   };
 
@@ -259,7 +259,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           className="shrink-0 hidden lg:block"
           initial={false}
           animate={{ width: isExpanded ? "18rem" : "5.5rem" }}
-          transition={{ type: "spring", stiffness: 200, damping: 30, mass: 1 }}
+          transition={{ type: "spring", stiffness: 300, damping: 25, mass: 1 }}
         />
       )}
     </>

@@ -16,29 +16,29 @@ interface Scenario {
   text: string;
 }
 
-// Framer Motion Variants
+// Framer Motion Variants - AJUSTADO PARA VELOCIDADE MAIOR
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.1,
+      staggerChildren: 0.05, // Reduzido de 0.1
+      delayChildren: 0.05, // Reduzido de 0.1
       when: "beforeChildren"
     }
   },
   exit: {
     opacity: 0,
-    transition: { duration: 0.2 }
+    transition: { duration: 0.15 } // Reduzido de 0.2
   }
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
+  hidden: { opacity: 0, y: 15 }, // Reduzido deslocamento inicial de 20
   visible: {
     opacity: 1,
     y: 0,
-    transition: { type: "spring", stiffness: 300, damping: 24 }
+    transition: { type: "spring", stiffness: 450, damping: 25 } // Mais rígido e rápido (antes 300/24)
   }
 };
 
