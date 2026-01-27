@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Editor } from './components/Editor';
@@ -8,6 +7,7 @@ import { Menu, Search, X, Loader2, Command, FileText, ChevronRight, CornerDownLe
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { useDebounce } from './hooks/useDebounce';
 import { SmoothWrapper } from './components/SmoothWrapper';
+import StaggeredMenu from './components/StaggeredMenu';
 
 // --- HELPER: ACCENT INSENSITIVE HIGHLIGHT ---
 const escapeRegExp = (string: string) => {
@@ -61,7 +61,10 @@ const App: React.FC = () => {
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const isSearching = searchQuery !== debouncedSearchQuery; 
 
+  // OLD Sidebar logic reserved for Desktop
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarPinned, setIsSidebarPinned] = useState(true); // Default to pinned
+  
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   
@@ -85,6 +88,25 @@ const App: React.FC = () => {
     
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // --- AUTOMATIC LAYOUT ADJUSTMENT ---
+  useEffect(() => {
+    if (selectedTemplate && !isMobile) {
+      // If template selected on desktop, collapse sidebar to give space
+      setIsSidebarPinned(false);
+    } else if (!selectedTemplate && !isMobile) {
+      // If going back to list, expand sidebar again
+      setIsSidebarPinned(true);
+    }
+  }, [selectedTemplate, isMobile]);
+
+  // --- MENU DATA PREP ---
+  const menuItems = useMemo(() => {
+    return CATEGORIES.map(cat => ({
+      id: cat.id,
+      label: cat.name
+    }));
   }, []);
 
   // --- AUTOCOMPLETE SUGGESTIONS LOGIC ---
@@ -209,30 +231,45 @@ const App: React.FC = () => {
     <LayoutGroup>
       <div className="flex h-[100dvh] w-full overflow-hidden text-[#111] font-sans bg-transparent">
         
-        <Sidebar 
-          selectedCategory={debouncedSearchQuery ? 'all' : selectedCategory} 
-          onSelectCategory={(id) => {
-            setSelectedCategory(id);
-            setSearchQuery(''); 
-            setSelectedTemplate(null);
-          }}
-          isOpen={isSidebarOpen}
-          onCloseMobile={() => setIsSidebarOpen(false)}
-          isMobile={isMobile}
-        />
+        {/* NEW MOBILE MENU OVERLAY */}
+        {isMobile && (
+          <StaggeredMenu 
+            items={menuItems}
+            activeId={selectedCategory}
+            onSelectItem={(id) => {
+              setSelectedCategory(id);
+              setSearchQuery('');
+              setSelectedTemplate(null);
+            }}
+            socialItems={[
+              { label: 'Wise System', link: 'https://wisesystem.com.br' }
+            ]}
+          />
+        )}
+
+        {/* DESKTOP SIDEBAR - Hidden on Mobile now as StaggeredMenu takes over */}
+        {!isMobile && (
+          <Sidebar 
+            selectedCategory={debouncedSearchQuery ? 'all' : selectedCategory} 
+            onSelectCategory={(id) => {
+              setSelectedCategory(id);
+              setSearchQuery(''); 
+              setSelectedTemplate(null);
+            }}
+            isOpen={isSidebarOpen}
+            onCloseMobile={() => setIsSidebarOpen(false)}
+            isMobile={isMobile}
+            isPinned={isSidebarPinned}
+            onTogglePin={() => setIsSidebarPinned(!isSidebarPinned)}
+          />
+        )}
 
         <main className="flex-1 flex flex-col h-full overflow-hidden relative z-10 transition-all duration-500">
           
-          {/* Mobile Header */}
-          <header className="lg:hidden flex items-center justify-between px-5 py-3 bg-white/60 backdrop-blur-xl border-b border-white/20 sticky top-0 z-30 shrink-0">
-            <button 
-              onClick={() => setIsSidebarOpen(true)} 
-              className="p-2 -ml-2 text-black active:scale-95 transition-transform rounded-full hover:bg-black/5"
-            >
-              <Menu size={20} strokeWidth={0.75} />
-            </button>
-            <span className="font-serif italic text-xl font-medium tracking-tight text-black">QuickComms</span>
-            <div className="w-8" />
+          {/* Mobile Header - Adjusted to accommodate the overlay menu button */}
+          <header className="lg:hidden flex items-center justify-center px-5 py-4 bg-white/0 sticky top-0 z-30 shrink-0 pointer-events-none">
+            {/* Logo centered */}
+            <span className="font-serif italic text-xl font-medium tracking-tight text-black backdrop-blur-md bg-white/30 px-4 py-1 rounded-full border border-white/40 shadow-sm">QuickComms</span>
           </header>
 
           {/* Content Wrapper */}
@@ -245,7 +282,7 @@ const App: React.FC = () => {
                 flex flex-col shrink-0 relative z-20 
                 w-full h-full
                 ${selectedTemplate 
-                  ? 'lg:flex-[0_0_24rem] xl:flex-[0_0_28rem] lg:max-w-[30vw]' 
+                  ? 'lg:flex-[0_0_20rem] xl:flex-[0_0_24rem] lg:max-w-[25vw]' // Made smaller when editor is open
                   : 'lg:w-full'}
                 
                 /* LIQUID GLASS REFINEMENT */

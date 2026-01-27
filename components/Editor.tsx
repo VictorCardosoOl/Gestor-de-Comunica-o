@@ -1,11 +1,10 @@
-
-import React, { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Template, CommunicationChannel } from '../types';
 import { Copy, RefreshCw, Check, MoveLeft, Sparkles, SlidersHorizontal, Loader2, Quote, X, Calendar, Clock, AlignLeft } from 'lucide-react';
 import { refineText } from '../services/geminiService';
 import { useTemplateCopier } from '../hooks/useTemplateCopier';
 import { MagneticButton } from './MagneticButton';
-import gsap from 'gsap';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface EditorProps {
   template: Template;
@@ -17,11 +16,36 @@ interface Scenario {
   text: string;
 }
 
+// Framer Motion Variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.1,
+      when: "beforeChildren"
+    }
+  },
+  exit: {
+    opacity: 0,
+    transition: { duration: 0.2 }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: "spring", stiffness: 300, damping: 24 }
+  }
+};
+
 export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
   const [subject, setSubject] = useState(template.subject || '');
   
-  // rawContent holds the template WITH placeholders (e.g., [Data]). 
-  // This is the source of truth for generating the final content when inputs change.
+  // rawContent holds the template WITH placeholders.
   const [rawContent, setRawContent] = useState(template.content);
   const [rawSecondaryContent, setRawSecondaryContent] = useState(template.secondaryContent || '');
 
@@ -52,7 +76,6 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
   const formatValueForText = (value: string, type: string) => {
     if (!value) return '';
     if (type === 'date') {
-      // Input date is YYYY-MM-DD, output should be DD/MM/YYYY
       const parts = value.split('-');
       if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
     }
@@ -74,7 +97,6 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
   };
 
   const generateOSFromDate = (dateStr: string) => {
-    // Input: YYYY-MM-DD -> Output: YYYYMMDD
     if (!dateStr) return '';
     return dateStr.replace(/-/g, '');
   };
@@ -119,7 +141,6 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
   useEffect(() => {
     setSubject(template.subject || '');
     
-    // Process static tags immediately into the RAW content, so they are fixed
     const processedContent = processStaticTags(template.content);
     const processedSecondary = processStaticTags(template.secondaryContent || '');
 
@@ -148,12 +169,8 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
     return () => clearTimeout(timer);
   }, [content, secondaryContent, isScenarioMode, template.id]);
 
-  // Detect Placeholders from the TEMPLATE (not the current content which might have them replaced)
   const placeholders = useMemo(() => {
     const regex = /\[(.*?)\]/g;
-    // We look at the RAW content to find placeholders that haven't been filled yet, 
-    // OR we look at the original template. 
-    // Better to use the template as source of truth for inputs.
     const allText = `${template.subject || ''} ${template.content} ${template.secondaryContent || ''} ${template.tertiaryContent || ''}`;
     const found = allText.match(regex);
     if (!found) return [];
@@ -169,32 +186,20 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
   // --- CORE REPLACEMENT LOGIC ---
   const generateContentFromRaw = (baseText: string, values: Record<string, string>) => {
     let result = baseText;
-    
-    // Iterate over ALL placeholders found in the template
     placeholders.forEach(ph => {
       const type = getInputType(ph);
-      // Value from state or empty
       const rawVal = values[ph] || ''; 
-      
-      // If we have a value, or if it's a specific calculated field that might be empty
-      // actually, if it's empty, we keep the placeholder? 
-      // No, usually users want to see the blank space filled or removed.
-      // Let's keep the placeholder if empty, so they see what's missing in the text.
       if (rawVal) {
         const formattedVal = formatValueForText(rawVal, type);
-        // Global replace of the placeholder
         result = result.split(ph).join(formattedVal);
       }
     });
-
     return result;
   };
 
   const handleVariableChange = (placeholder: string, inputValue: string) => {
-    // 1. Update values state
     const newValues = { ...variableValues, [placeholder]: inputValue };
 
-    // 2. Run Automation Logic (Updates newValues directly)
     if (placeholder === '[Horário Início]' || placeholder === '[Horário Fim]') {
       const start = placeholder === '[Horário Início]' ? inputValue : newValues['[Horário Início]'];
       const end = placeholder === '[Horário Fim]' ? inputValue : newValues['[Horário Fim]'];
@@ -208,12 +213,9 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
 
     setVariableValues(newValues);
 
-    // 3. Rebuild Content from RAW (This fixes the "Comercialadastro" bug)
-    // We go back to the source (rawContent) and apply ALL current values.
-    // This ensures we never replace partial words, only the [Placeholders].
     const newContent = generateContentFromRaw(rawContent, newValues);
     const newSecondary = generateContentFromRaw(rawSecondaryContent, newValues);
-    const newSubject = generateContentFromRaw(template.subject || '', newValues); // Subject usually doesn't need raw state logic as it's simple, but safe to do.
+    const newSubject = generateContentFromRaw(template.subject || '', newValues); 
 
     setContent(newContent);
     setSecondaryContent(newSecondary);
@@ -222,7 +224,6 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
 
   const handleReset = () => {
     if (window.confirm('Restaurar texto original?')) {
-      // Re-process static tags
       const processedContent = processStaticTags(template.content);
       const processedSecondary = processStaticTags(template.secondaryContent || '');
       
@@ -241,54 +242,14 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
     setIsRefining(true);
     try {
       const refined = await refineText(content, `Canal: ${template.channel}. Objetivo: Melhorar clareza, correção gramatical e tom profissional. Mantenha estritamente as variáveis e a formatação (negrito, links).`);
-      
-      // When AI refines, it becomes the new "RAW" source of truth.
-      // We assume the AI respected the prompt and kept the [Placeholders] or the values currently in them.
-      // If it kept values, we can't revert easily. If it kept placeholders (best case), we set it as raw.
-      // Given the prompt asks to keep variables, it usually keeps the *text* that is currently there.
-      // Since 'content' currently has values filled in, the AI will refine the text *with values*.
-      // This breaks the "Rebuild from Raw" logic for subsequent edits.
-      
-      // FIX: To support AI + Input flow, we effectively "commit" the current state.
-      // The user can continue editing, but variables might be lost if AI removed brackets.
-      // We set the refined text as the new content.
       setContent(refined);
-      
-      // We update rawContent to this new refined text, but we must acknowledge that
-      // if values were already filled, the placeholders are gone.
-      // The user will have to manually edit or reset if they want to change variables via inputs after AI.
       setRawContent(refined); 
-
     } catch (error) {
       console.error(error);
       alert('Não foi possível conectar à IA no momento.');
     } finally {
       setIsRefining(false);
     }
-  };
-
-  // --- MOTION ---
-  useLayoutEffect(() => {
-    const ctx = gsap.context(() => {
-      const tl = gsap.timeline();
-      tl.from(".char-reveal", {
-        yPercent: 120, opacity: 0, rotationZ: 5, stagger: 0.02, duration: 1, ease: "power4.out"
-      });
-      tl.from(".animate-entry", {
-        y: 60, opacity: 0, duration: 1.2, stagger: 0.1, ease: "power3.out", clearProps: "all"
-      }, "-=0.8");
-    }, containerRef);
-    return () => ctx.revert();
-  }, [template.id]);
-
-  const splitText = (text: string) => {
-    return text.split("").map((char, i) => (
-      <span key={i} className="inline-block overflow-hidden align-top">
-        <span className="char-reveal inline-block">
-          {char === " " ? "\u00A0" : char}
-        </span>
-      </span>
-    ));
   };
 
   // --- SCENARIO DATA ---
@@ -306,12 +267,17 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
   }, [content, isScenarioMode]);
 
   return (
-    <div 
+    <motion.div 
       ref={containerRef}
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
       className="h-full flex flex-col bg-transparent relative lg:rounded-3xl overflow-hidden"
     >
       {/* Editorial Header */}
-      <div 
+      <motion.div 
+        variants={itemVariants}
         className="flex-none flex flex-col xl:flex-row xl:items-center justify-between gap-6 border-b border-white/20 relative z-20 bg-gradient-to-b from-white/60 via-white/40 to-white/10 backdrop-blur-2xl shrink-0"
         style={{ padding: 'clamp(1.5rem, 3vw, 2.5rem)' }}
       >
@@ -324,19 +290,19 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
           </button>
           
           <div className="flex flex-col gap-2 min-w-0">
-             <div className="flex items-center gap-3 animate-entry">
+             <div className="flex items-center gap-3">
                <span className="w-1.5 h-1.5 bg-black rounded-full shadow-[0_0_10px_rgba(0,0,0,0.2)]"></span>
                <span className="text-editorial-label text-black/40">
                   {template.channel === CommunicationChannel.EMAIL ? 'Email' : (template.channel === 'PROMPT' ? 'Prompt' : 'Chat')}
                </span>
              </div>
              <h1 className="text-editorial-title text-black leading-none drop-shadow-sm break-words hyphens-auto pr-2">
-               {splitText(template.title)}
+               {template.title}
              </h1>
           </div>
         </div>
         
-        <div className="flex flex-wrap items-center gap-2 md:gap-3 self-start md:self-auto pt-2 xl:pt-0 animate-entry">
+        <div className="flex flex-wrap items-center gap-2 md:gap-3 self-start md:self-auto pt-2 xl:pt-0">
           {!isScenarioMode && (
             <MagneticButton
               onClick={handleAiRefine}
@@ -378,13 +344,15 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
             <X size={18} strokeWidth={1} />
           </MagneticButton>
         </div>
-      </div>
+      </motion.div>
 
        {/* Variable Inputs */}
        <div className="flex-1 overflow-y-auto custom-scrollbar relative">
+         <AnimatePresence>
          {placeholders.length > 0 && showVariables && (
-            <div 
-              className="bg-white/20 backdrop-blur-xl border-b border-white/20 shrink-0 relative z-20 overflow-hidden shadow-sm animate-entry"
+            <motion.div 
+              variants={itemVariants}
+              className="bg-white/20 backdrop-blur-xl border-b border-white/20 shrink-0 relative z-20 overflow-hidden shadow-sm"
             >
               <div className="px-6 md:px-12 py-8 md:py-10">
                 <div className="flex items-center gap-2 mb-6 md:mb-8 text-black/60">
@@ -437,15 +405,20 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                   })}
                 </div>
               </div>
-            </div>
+            </motion.div>
           )}
+          </AnimatePresence>
 
         <div className="w-full" style={{ padding: 'clamp(1rem, 3vw, 3rem)' }}>
           <div className="max-w-4xl mx-auto flex flex-col gap-6 md:gap-12 pb-12">
             {isScenarioMode ? (
               <div className="grid grid-cols-1 gap-6">
                   {scenarios.map((scene, idx) => (
-                    <div key={idx} className="animate-entry relative p-6 md:p-8 bg-gradient-to-br from-white/60 via-white/40 to-white/20 backdrop-blur-3xl border border-white/40 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.03)] rounded-2xl flex flex-col gap-4">
+                    <motion.div 
+                      key={idx} 
+                      variants={itemVariants}
+                      className="relative p-6 md:p-8 bg-gradient-to-br from-white/60 via-white/40 to-white/20 backdrop-blur-3xl border border-white/40 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.03)] rounded-2xl flex flex-col gap-4"
+                    >
                       <div className="flex justify-between items-center border-b border-black/5 pb-3">
                         <div className="flex items-center gap-2">
                           <Quote size={12} className="text-black/30" />
@@ -458,12 +431,15 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                       <div className="font-sans text-editorial-body text-[#1a1a1a] whitespace-pre-wrap">
                         {scene.text}
                       </div>
-                    </div>
+                    </motion.div>
                   ))}
               </div>
             ) : (
               <>
-                <div className="animate-entry relative flex flex-col w-full min-h-[30vh] p-6 md:p-14 bg-gradient-to-br from-white/60 via-white/40 to-white/20 backdrop-blur-3xl border border-white/40 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.03)] rounded-2xl md:rounded-3xl">
+                <motion.div 
+                  variants={itemVariants}
+                  className="relative flex flex-col w-full min-h-[30vh] p-6 md:p-14 bg-gradient-to-br from-white/60 via-white/40 to-white/20 backdrop-blur-3xl border border-white/40 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.03)] rounded-2xl md:rounded-3xl"
+                >
                   <div className="absolute inset-0 pointer-events-none opacity-[0.03] mix-blend-multiply rounded-2xl md:rounded-3xl" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'6\' height=\'6\' viewBox=\'0 0 6 6\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'%23000000\' fill-opacity=\'1\' fill-rule=\'evenodd\'%3E%3Cpath d=\'M5 0h1L0 6V5zM6 5v1H5z\'/%3E%3C/g%3E%3C/svg%3E")' }}></div>
                   
                   {template.channel === CommunicationChannel.EMAIL && (
@@ -490,10 +466,13 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                       onInput={(e) => adjustTextareaHeight(e.target as HTMLTextAreaElement)}
                     />
                   </div>
-                </div>
+                </motion.div>
 
                 {secondaryContent !== '' && (
-                  <div className="animate-entry relative flex flex-col w-full min-h-[15rem] p-6 md:p-14 bg-gradient-to-br from-white/60 via-white/40 to-white/20 backdrop-blur-3xl border border-white/40 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.03)] rounded-2xl md:rounded-3xl">
+                  <motion.div 
+                    variants={itemVariants}
+                    className="relative flex flex-col w-full min-h-[15rem] p-6 md:p-14 bg-gradient-to-br from-white/60 via-white/40 to-white/20 backdrop-blur-3xl border border-white/40 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.03)] rounded-2xl md:rounded-3xl"
+                  >
                     <div className="absolute inset-0 pointer-events-none opacity-[0.03] mix-blend-multiply rounded-2xl md:rounded-3xl" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'6\' height=\'6\' viewBox=\'0 0 6 6\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'%23000000\' fill-opacity=\'1\' fill-rule=\'evenodd\'%3E%3Cpath d=\'M5 0h1L0 6V5zM6 5v1H5z\'/%3E%3C/g%3E%3C/svg%3E")' }}></div>
                     <div className="mb-6 md:mb-10 relative z-10 shrink-0">
                       <div className="flex items-center gap-3 border-b border-black/5 pb-2">
@@ -513,7 +492,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                         onInput={(e) => adjustTextareaHeight(e.target as HTMLTextAreaElement)}
                       />
                     </div>
-                  </div>
+                  </motion.div>
                 )}
               </>
             )}
@@ -522,7 +501,10 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
       </div>
 
       {!isScenarioMode && (
-        <div className="animate-entry flex-none bg-gradient-to-t from-white/80 via-white/60 to-white/30 backdrop-blur-xl flex flex-col sm:flex-row sm:justify-end items-stretch sm:items-center gap-3 md:gap-4 border-t border-white/30 z-30" style={{ padding: 'clamp(1rem, 2vw, 2rem)' }}>
+        <motion.div 
+          variants={itemVariants}
+          className="flex-none bg-gradient-to-t from-white/80 via-white/60 to-white/30 backdrop-blur-xl flex flex-col sm:flex-row sm:justify-end items-stretch sm:items-center gap-3 md:gap-4 border-t border-white/30 z-30" style={{ padding: 'clamp(1rem, 2vw, 2rem)' }}
+        >
           {template.secondaryContent && (
             <MagneticButton onClick={() => copyToClipboard(secondaryContent, 'secondary')} className={`group relative overflow-hidden flex items-center justify-center gap-2 md:gap-3 px-6 md:px-8 py-3.5 md:py-4 transition-all duration-300 rounded-full border ${isCopied('secondary') ? 'bg-black text-white border-black shadow-lg' : 'bg-white/40 text-gray-600 border-white/50 hover:border-white/80 hover:text-black hover:shadow-[0_0_20px_rgba(255,255,255,0.5)]'}`}>
               <div className="relative z-10 flex items-center gap-2">
@@ -538,8 +520,8 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                <span className="text-editorial-label whitespace-nowrap font-sans">{isCopied('main') ? 'Copiado' : `Copiar ${template.secondaryContent ? 'Email' : 'Texto'}`}</span>
             </div>
           </MagneticButton>
-        </div>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 };

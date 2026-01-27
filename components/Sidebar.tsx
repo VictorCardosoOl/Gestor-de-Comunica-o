@@ -21,6 +21,9 @@ interface SidebarProps {
   isOpen: boolean; // Mobile open state
   onCloseMobile: () => void;
   isMobile: boolean; // Screen context
+  // New props for controlled state
+  isPinned: boolean;
+  onTogglePin: () => void;
 }
 
 const IconMap: Record<string, React.FC<any>> = {
@@ -36,9 +39,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectCategory, 
   isOpen,
   onCloseMobile,
-  isMobile
+  isMobile,
+  isPinned,
+  onTogglePin
 }) => {
-  const [isPinned, setIsPinned] = useState(true);
   const [isHovered, setIsHovered] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
@@ -138,7 +142,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   transition={{ duration: 0.2 }}
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
-                  onClick={() => setIsPinned(!isPinned)}
+                  onClick={onTogglePin}
                   className="w-6 h-6 flex items-center justify-center bg-white/60 border border-white/40 backdrop-blur-md shadow-sm rounded-full text-black/60 hover:text-black cursor-pointer transition-colors"
                   title={isPinned ? "Desafixar Sidebar" : "Fixar Sidebar"}
                 >
