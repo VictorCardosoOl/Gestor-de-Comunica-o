@@ -1,39 +1,18 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Editor } from './components/Editor';
 import { INITIAL_TEMPLATES, CATEGORIES } from './constants';
 import { Template } from './types';
-import { Menu, Search, X, Loader2, Command, FileText, ChevronRight, CornerDownLeft } from 'lucide-react';
+import { Search, X, Loader2, FileText, ChevronRight, Command } from 'lucide-react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { useDebounce } from './hooks/useDebounce';
 import { SmoothWrapper } from './components/SmoothWrapper';
 import StaggeredMenu from './components/StaggeredMenu';
+import { getAccentInsensitiveRegex } from './utils/textUtils';
 
-// --- HELPER: ACCENT INSENSITIVE HIGHLIGHT ---
-const escapeRegExp = (string: string) => {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-};
-
-const getAccentInsensitiveRegex = (text: string) => {
-   // Mapping for common pt-BR accents to regex groups
-   const accMap: Record<string, string> = {
-     'a': '[aàáâãäå]', 'e': '[eèéêë]', 'i': '[iìíîï]', 'o': '[oòóôõöø]', 'u': '[uùúûü]', 'c': '[cç]', 'n': '[nñ]'
-   };
-   
-   const escaped = escapeRegExp(text);
-   const pattern = escaped.split('').map((char) => {
-      const lower = char.toLowerCase();
-      return accMap[lower] || char;
-   }).join('');
-   
-   return new RegExp(`(${pattern})`, 'gi');
-};
-
-// Optimized with Memo to prevent re-rendering entire lists on selection changes
 const HighlightedText = React.memo(({ text, highlight, className }: { text: string, highlight: string, className?: string }) => {
-  if (!highlight.trim()) {
-    return <span className={className}>{text}</span>;
-  }
+  if (!highlight.trim()) return <span className={className}>{text}</span>;
 
   const regex = useMemo(() => getAccentInsensitiveRegex(highlight.trim()), [highlight]);
   const parts = text.split(regex);
@@ -42,12 +21,10 @@ const HighlightedText = React.memo(({ text, highlight, className }: { text: stri
     <span className={className}>
       {parts.map((part, i) => 
         regex.test(part) ? (
-          <span key={i} className="bg-yellow-200/80 text-black font-semibold rounded-[2px] px-0.5 box-decoration-clone shadow-sm">
+          <span key={i} className="bg-yellow-200/50 text-black font-medium rounded-[1px] px-0.5 box-decoration-clone">
             {part}
           </span>
-        ) : (
-          part
-        )
+        ) : part
       )}
     </span>
   );
@@ -58,27 +35,21 @@ const App: React.FC = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Debounce for the MAIN list filtering (heavy operation)
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const isSearching = searchQuery !== debouncedSearchQuery; 
 
-  // OLD Sidebar logic reserved for Desktop
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isSidebarPinned, setIsSidebarPinned] = useState(true); // Default to pinned
+  const [isSidebarPinned, setIsSidebarPinned] = useState(true);
   
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   
-  // Suggestion state
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
   
-  // REFS PARA O SCROLL DO LENIS
   const listWrapperRef = useRef<HTMLDivElement>(null);
   const listContentRef = useRef<HTMLDivElement>(null);
 
-  const [isMobile, setIsMobile] = useState(() => 
-    typeof window !== 'undefined' ? window.innerWidth < 1024 : false
-  );
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -91,18 +62,14 @@ const App: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // --- AUTOMATIC LAYOUT ADJUSTMENT ---
   useEffect(() => {
     if (selectedTemplate && !isMobile) {
-      // If template selected on desktop, collapse sidebar to give space
       setIsSidebarPinned(false);
     } else if (!selectedTemplate && !isMobile) {
-      // If going back to list, expand sidebar again
       setIsSidebarPinned(true);
     }
   }, [selectedTemplate, isMobile]);
 
-  // --- MENU DATA PREP ---
   const menuItems = useMemo(() => {
     return CATEGORIES.map(cat => ({
       id: cat.id,
@@ -110,30 +77,26 @@ const App: React.FC = () => {
     }));
   }, []);
 
-  // --- AUTOCOMPLETE SUGGESTIONS LOGIC ---
+  const normalizeText = (str: string) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "";
+
   const suggestions = useMemo(() => {
     if (!searchQuery.trim()) return [];
     
-    const normalize = (str: string) => 
-      str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "";
-    
-    const q = normalize(searchQuery);
+    const q = normalizeText(searchQuery);
 
-    // Filter mainly by Title for suggestions
     return INITIAL_TEMPLATES
-      .filter(t => normalize(t.title).includes(q))
-      .slice(0, 5); // Limit to top 5
+      .filter(t => normalizeText(t.title).includes(q))
+      .slice(0, 5); 
   }, [searchQuery]);
 
-  // Keyboard Navigation for Suggestions
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      const isCmdK = (e.metaKey || e.ctrlKey) && e.key === 'k';
+      if (isCmdK) {
         e.preventDefault();
         searchInputRef.current?.focus();
       }
 
-      // Dropdown Navigation
       if (isSearchFocused && suggestions.length > 0) {
         if (e.key === 'ArrowDown') {
           e.preventDefault();
@@ -143,8 +106,7 @@ const App: React.FC = () => {
           setActiveSuggestionIndex(prev => (prev > 0 ? prev - 1 : suggestions.length - 1));
         } else if (e.key === 'Enter' && activeSuggestionIndex >= 0) {
           e.preventDefault();
-          const selected = suggestions[activeSuggestionIndex];
-          handleSuggestionClick(selected);
+          handleSuggestionClick(suggestions[activeSuggestionIndex]);
         }
       }
 
@@ -163,39 +125,23 @@ const App: React.FC = () => {
 
   const handleSuggestionClick = (template: Template) => {
     setSelectedTemplate(template);
-    setSearchQuery(template.title); // Optional: fill bar
+    setSearchQuery(template.title); 
     setIsSearchFocused(false);
     setActiveSuggestionIndex(-1);
     searchInputRef.current?.blur();
   };
 
-  // --- MAIN LIST FILTERING LOGIC ---
   const filteredTemplates = useMemo(() => {
     let filtered = INITIAL_TEMPLATES || [];
-    
-    const normalize = (str: string) => 
-      str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "";
-
-    const query = normalize(debouncedSearchQuery.trim());
+    const query = normalizeText(debouncedSearchQuery.trim());
 
     if (query) {
        filtered = filtered.filter(t => {
-         const title = normalize(t.title);
-         const description = normalize(t.description || '');
-         const content = normalize(t.content);
-         const subject = normalize(t.subject || '');
-         const secondary = normalize(t.secondaryContent || '');
-         
-         return title.includes(query) || 
-                description.includes(query) ||
-                content.includes(query) ||
-                subject.includes(query) ||
-                secondary.includes(query);
+         const fields = [t.title, t.description, t.content, t.subject, t.secondaryContent];
+         return fields.some(field => normalizeText(field || '').includes(query));
        });
-    } else {
-      if (selectedCategory !== 'all') {
-        filtered = filtered.filter(t => t.category === selectedCategory);
-      }
+    } else if (selectedCategory !== 'all') {
+      filtered = filtered.filter(t => t.category === selectedCategory);
     }
 
     return filtered;
@@ -208,19 +154,19 @@ const App: React.FC = () => {
       : CATEGORIES.find(c => c.id === selectedCategory)?.name || 'Módulo');
 
   const editorPanelVariants = {
-    initial: { opacity: 0, x: 40, scale: 0.98 },
+    initial: { opacity: 0, x: 20, scale: 0.99 },
     animate: { 
       opacity: 1, x: 0, scale: 1,
-      transition: { type: "spring", stiffness: 300, damping: 28, mass: 1 } // Suavizado
+      transition: { type: "spring", stiffness: 200, damping: 25, mass: 1 } 
     },
-    exit: { opacity: 0, x: 20, transition: { duration: 0.2, ease: "easeInOut" } }
+    exit: { opacity: 0, x: 10, transition: { duration: 0.2 } }
   };
 
   const mobileEditorVariants = {
     initial: { y: '100%' },
     animate: { 
       y: 0,
-      transition: { type: "spring", damping: 30, stiffness: 300 } // Suavizado
+      transition: { type: "spring", damping: 30, stiffness: 300 }
     },
     exit: { 
       y: '100%',
@@ -230,9 +176,8 @@ const App: React.FC = () => {
 
   return (
     <LayoutGroup>
-      <div className="flex h-[100dvh] w-full overflow-hidden text-[#111] font-sans bg-transparent">
+      <div className="flex h-[100dvh] w-full overflow-hidden text-[#111] font-sans bg-transparent relative">
         
-        {/* NEW MOBILE MENU OVERLAY */}
         {isMobile && (
           <StaggeredMenu 
             items={menuItems}
@@ -242,13 +187,10 @@ const App: React.FC = () => {
               setSearchQuery('');
               setSelectedTemplate(null);
             }}
-            socialItems={[
-              { label: 'Wise System', link: 'https://wisesystem.com.br' }
-            ]}
+            socialItems={[{ label: 'Wise System', link: 'https://wisesystem.com.br' }]}
           />
         )}
 
-        {/* DESKTOP SIDEBAR - Hidden on Mobile now as StaggeredMenu takes over */}
         {!isMobile && (
           <Sidebar 
             selectedCategory={debouncedSearchQuery ? 'all' : selectedCategory} 
@@ -267,48 +209,34 @@ const App: React.FC = () => {
 
         <main className="flex-1 flex flex-col h-full overflow-hidden relative z-10 transition-all duration-500">
           
-          {/* Mobile Header - Adjusted to accommodate the overlay menu button */}
           <header className="lg:hidden flex items-center justify-center px-5 py-4 bg-white/0 sticky top-0 z-30 shrink-0 pointer-events-none">
-            {/* Logo centered */}
             <span className="font-serif italic text-xl font-medium tracking-tight text-black backdrop-blur-md bg-white/30 px-4 py-1 rounded-full border border-white/40 shadow-sm">QuickComms</span>
           </header>
 
-          {/* Content Wrapper */}
           <div className="flex-1 flex overflow-hidden w-full relative lg:p-4 lg:gap-4">
             
-            {/* List Panel */}
             <motion.div 
               layout 
               className={`
-                flex flex-col shrink-0 relative z-20 
-                w-full h-full
-                ${selectedTemplate 
-                  ? 'lg:flex-[0_0_20rem] xl:flex-[0_0_24rem] lg:max-w-[25vw]' // Made smaller when editor is open
-                  : 'lg:w-full'}
-                
-                /* LIQUID GLASS REFINEMENT */
-                bg-gradient-to-b from-white/40 to-white/5
-                backdrop-blur-3xl
-                lg:border border-white/20
-                lg:shadow-[0_8px_32px_0_rgba(0,0,0,0.02)]
-                lg:rounded-3xl
-                overflow-hidden
+                flex flex-col shrink-0 relative z-20 w-full h-full
+                ${selectedTemplate ? 'lg:flex-[0_0_20rem] xl:flex-[0_0_24rem] lg:max-w-[25vw]' : 'lg:w-full'}
+                bg-gradient-to-b from-white/60 to-white/20 backdrop-blur-3xl
+                lg:border border-white/30 lg:shadow-[0_8px_32px_0_rgba(0,0,0,0.01)] lg:rounded-2xl overflow-hidden
               `}
-              transition={{ type: "spring", stiffness: 280, damping: 25 }} // Ajuste para suavidade
+              transition={{ type: "spring", stiffness: 280, damping: 25 }}
             >
-               <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay rounded-3xl" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }}></div>
+               <div className="absolute inset-0 opacity-[0.02] pointer-events-none mix-blend-overlay rounded-3xl" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }}></div>
 
-              {/* Header Title */}
-              <div className="px-6 pt-8 pb-4 shrink-0 z-10">
+              <div className="px-6 pt-10 pb-4 shrink-0 z-10">
                 <motion.div
                   layout="position"
                   key={currentCategoryName}
-                  initial={{ opacity: 0, y: 10, filter: 'blur(5px)' }}
-                  animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                  transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} 
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, ease: "easeOut" }}
                 >
-                  <div className="flex flex-col gap-1">
-                    <span className="text-editorial-label text-gray-500 pl-1">
+                  <div className="flex flex-col gap-2">
+                    <span className="text-editorial-label text-gray-400 pl-0.5">
                       {debouncedSearchQuery ? 'Pesquisa' : 'Categoria'}
                     </span>
                     <motion.h2 
@@ -321,68 +249,74 @@ const App: React.FC = () => {
                 </motion.div>
               </div>
 
-              {/* Enhanced Search Bar */}
+              {/* --- SEARCH BAR SECTION --- */}
               <div className="px-6 pb-6 shrink-0 z-30 relative">
                 <motion.div 
                   layout
+                  animate={{
+                    backgroundColor: isSearchFocused ? "rgba(255, 255, 255, 1)" : "rgba(255, 255, 255, 0.4)",
+                    borderColor: isSearchFocused ? "rgba(255, 255, 255, 0)" : "rgba(255, 255, 255, 0.5)",
+                    boxShadow: isSearchFocused ? "0 10px 40px -10px rgba(0,0,0,0.05), 0 0 0 1px rgba(0,0,0,0.02)" : "0 0 0 0 rgba(0,0,0,0)",
+                  }}
                   className={`
-                    relative group flex items-center w-full rounded-2xl transition-all duration-300 ease-out
-                    ${isSearchFocused 
-                      ? 'bg-white/95 backdrop-blur-xl shadow-[0_8px_40px_-10px_rgba(0,0,0,0.15)] ring-1 ring-black/10 scale-[1.01]' 
-                      : 'bg-white/40 backdrop-blur-md border border-white/40 hover:bg-white/60 hover:border-white/50 shadow-sm'}
-                    /* Rounded corners fix for dropdown */
-                    ${suggestions.length > 0 && isSearchFocused ? 'rounded-b-none' : ''}
+                    relative group flex items-center w-full rounded-2xl transition-all duration-300 ease-out border
+                    ${suggestions.length > 0 && isSearchFocused ? 'rounded-b-none border-b-0' : ''}
                   `}
                 >
-                  <div className={`pl-4 transition-colors duration-300 ${isSearchFocused ? 'text-black' : 'text-gray-400'}`}>
-                    {isSearching ? (
-                      <Loader2 size={16} className="animate-spin" />
-                    ) : (
-                      <Search size={16} strokeWidth={0.75} />
-                    )}
+                  <div className={`pl-4 flex items-center justify-center transition-all duration-300 ${isSearchFocused ? 'text-black' : 'text-gray-400'}`}>
+                    <AnimatePresence mode="wait">
+                      {isSearching ? (
+                        <motion.div key="loader" initial={{ opacity: 0, rotate: -90, scale: 0.8 }} animate={{ opacity: 1, rotate: 0, scale: 1 }} exit={{ opacity: 0, rotate: 90, scale: 0.8 }}>
+                          <Loader2 size={18} strokeWidth={1.5} className="animate-spin" />
+                        </motion.div>
+                      ) : (
+                         <motion.div key="search-icon" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}>
+                          <Search size={18} strokeWidth={1.5} />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
+                  
                   <input 
                     ref={searchInputRef}
                     type="text"
-                    placeholder="Buscar (⌘K)"
+                    placeholder="Buscar modelo..."
                     value={searchQuery}
-                    onFocus={() => {
-                      setIsSearchFocused(true);
-                      setActiveSuggestionIndex(-1);
-                    }}
-                    onBlur={() => {
-                      // Small timeout to allow click on dropdown items to register
-                      setTimeout(() => setIsSearchFocused(false), 200);
-                    }}
+                    onFocus={() => { setIsSearchFocused(true); setActiveSuggestionIndex(-1); }}
+                    onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-3 pr-10 py-3.5 bg-transparent border-none focus:ring-0 outline-none text-[#111] placeholder:text-gray-500/50 text-sm font-sans tracking-wide"
+                    className="
+                      w-full pl-3 pr-12 py-3.5 bg-transparent border-none focus:ring-0 outline-none 
+                      text-[#1a1a1a] text-base
+                      placeholder:font-serif placeholder:italic placeholder:text-gray-400/70 placeholder:text-lg
+                      font-sans font-normal tracking-normal
+                    "
                   />
+                  
                   <div className="absolute right-3 flex items-center gap-2">
-                     <AnimatePresence>
+                     <AnimatePresence mode="popLayout">
                        {searchQuery ? (
                          <motion.button 
-                           initial={{ opacity: 0, scale: 0.8, rotate: -45 }}
-                           animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                           exit={{ opacity: 0, scale: 0.8, rotate: 45 }}
-                           whileHover={{ scale: 1.1 }}
-                           whileTap={{ scale: 0.9 }}
-                           onClick={() => {
-                             setSearchQuery('');
-                             searchInputRef.current?.focus();
-                           }}
-                           className="p-1.5 rounded-full bg-black/5 hover:bg-black hover:text-white text-gray-500 transition-colors"
+                           key="clear-btn"
+                           initial={{ opacity: 0, scale: 0.8 }}
+                           animate={{ opacity: 1, scale: 1 }}
+                           exit={{ opacity: 0, scale: 0.8 }}
+                           onClick={() => { setSearchQuery(''); searchInputRef.current?.focus(); }}
+                           className="p-1 rounded-full bg-black/5 hover:bg-black hover:text-white text-gray-500 transition-colors"
                          >
-                           <X size={10} strokeWidth={1.5} />
+                           <X size={12} strokeWidth={2} />
                          </motion.button>
                        ) : (
                          !isMobile && !isSearchFocused && (
                            <motion.div 
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="pointer-events-none px-1.5 py-0.5 rounded border border-black/5 bg-black/5 text-[10px] font-sans text-black/30 font-medium"
+                            key="shortcut"
+                            initial={{ opacity: 0, x: 5 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 5 }}
+                            className="pointer-events-none flex items-center gap-0.5 px-2 py-1 rounded-md bg-white/50 border border-black/5 shadow-sm text-[10px] font-sans font-medium text-gray-400"
                            >
-                             ⌘K
+                             <Command size={9} />
+                             <span>K</span>
                            </motion.div>
                          )
                        )}
@@ -394,35 +328,44 @@ const App: React.FC = () => {
                 <AnimatePresence>
                   {isSearchFocused && suggestions.length > 0 && (
                     <motion.div
-                      initial={{ opacity: 0, y: -10, scaleY: 0.9 }}
-                      animate={{ opacity: 1, y: 0, scaleY: 1 }}
-                      exit={{ opacity: 0, y: -10, transition: { duration: 0.15 } }}
-                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                      className="absolute left-6 right-6 top-[calc(100%-24px)] pt-3 pb-2 bg-white/95 backdrop-blur-xl border-x border-b border-white/50 shadow-2xl rounded-b-2xl z-40 overflow-hidden origin-top"
+                      initial={{ opacity: 0, y: -5, height: 0 }}
+                      animate={{ opacity: 1, y: 0, height: 'auto' }}
+                      exit={{ opacity: 0, y: -5, height: 0, transition: { duration: 0.15 } }}
+                      className="absolute left-6 right-6 top-[calc(100%-1px)] bg-white/95 backdrop-blur-2xl border-x border-b border-black/5 shadow-2xl rounded-b-2xl z-40 overflow-hidden"
                     >
-                      <div className="flex flex-col">
-                        <div className="px-4 py-1.5 flex justify-between items-center text-[10px] text-gray-400 font-medium uppercase tracking-wider">
+                      <div className="flex flex-col py-2">
+                        <div className="px-5 py-2 flex justify-between items-center text-[10px] text-gray-400 font-semibold uppercase tracking-widest border-b border-black/5 mb-1">
                           <span>Sugestões</span>
-                          <span className="flex items-center gap-1">
-                            Use <CornerDownLeft size={10} /> para selecionar
-                          </span>
                         </div>
                         {suggestions.map((sug, idx) => (
                           <button
                             key={sug.id}
                             className={`
-                              text-left px-4 py-2.5 flex items-center justify-between group
+                              relative text-left px-5 py-3 flex items-center justify-between group
                               transition-colors duration-200
-                              ${idx === activeSuggestionIndex ? 'bg-black/5 text-black' : 'hover:bg-black/5 text-gray-700'}
                             `}
                             onClick={() => handleSuggestionClick(sug)}
                             onMouseEnter={() => setActiveSuggestionIndex(idx)}
                           >
-                            <span className="truncate text-sm font-sans">
+                             {idx === activeSuggestionIndex && (
+                              <motion.div
+                                layoutId="suggestion-hover"
+                                className="absolute inset-0 bg-black/[0.03]"
+                                initial={false}
+                                transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                              />
+                            )}
+                            <span className="truncate text-sm font-sans text-gray-700 relative z-10">
                               <HighlightedText text={sug.title} highlight={searchQuery} />
                             </span>
                             {idx === activeSuggestionIndex && (
-                              <ChevronRight size={14} className="text-black/40" />
+                              <motion.div
+                                initial={{ opacity: 0, x: -5 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                className="relative z-10"
+                              >
+                                <ChevronRight size={14} strokeWidth={1.5} className="text-black/60" />
+                              </motion.div>
                             )}
                           </button>
                         ))}
@@ -432,45 +375,37 @@ const App: React.FC = () => {
                 </AnimatePresence>
               </div>
 
-              {/* Template List */}
-              <div 
-                className="flex-1 overflow-y-auto custom-scrollbar relative z-10" 
-                ref={listWrapperRef}
-              >
+              <div className="flex-1 overflow-y-auto custom-scrollbar relative z-10" ref={listWrapperRef}>
                 <SmoothWrapper 
-                  className="min-h-full px-3 pb-6" 
+                  className="min-h-full px-4 pb-6" 
                   wrapperRef={listWrapperRef} 
                   contentRef={listContentRef}
                   resetDependency={[selectedCategory, debouncedSearchQuery]} 
                 >
-                  <div 
-                    ref={listContentRef}
-                    className="flex flex-col gap-2.5"
-                  >
+                  <div ref={listContentRef} className="flex flex-col gap-2">
                     <LayoutGroup id="template-list">
                       <AnimatePresence mode="popLayout">
                       {filteredTemplates.length === 0 ? (
                         <motion.div 
-                          initial={{ opacity: 0, y: 10 }} 
-                          animate={{ opacity: 1, y: 0 }} 
-                          exit={{ opacity: 0 }}
-                          className="flex flex-col items-center justify-center py-20 text-center px-6"
+                          key="no-results" 
+                          initial={{ opacity: 0, scale: 0.95, y: 10 }} 
+                          animate={{ opacity: 1, scale: 1, y: 0 }} 
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          transition={{ duration: 0.4, ease: "easeOut" }}
+                          className="flex flex-col items-center justify-center py-20 text-center px-8"
                         >
-                          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-white/80 to-white/20 border border-white/50 flex items-center justify-center mb-6 shadow-lg shadow-black/5 backdrop-blur-md">
-                            <Search size={24} strokeWidth={0.5} className="text-black/40" />
+                          <div className="w-20 h-20 rounded-full bg-white/60 border border-white shadow-lg flex items-center justify-center mb-6">
+                            <Search size={32} strokeWidth={0.5} className="text-gray-300" />
                           </div>
-                          <p className="font-serif italic text-2xl text-black/80 mb-2">Sem resultados</p>
-                          <p className="text-[11px] text-gray-500 max-w-[200px] leading-relaxed font-light mb-6">
-                            Não encontramos nenhum modelo correspondente a "{debouncedSearchQuery}".
+                          <p className="font-serif italic text-3xl text-black/80 mb-3">Sem resultados</p>
+                          <p className="text-sm text-gray-400 max-w-[240px] leading-relaxed font-light mb-8">
+                            Não encontramos nenhum modelo para <br/> "<span className="text-black font-medium">{debouncedSearchQuery}</span>".
                           </p>
                            <motion.button
                              whileHover={{ scale: 1.05 }}
                              whileTap={{ scale: 0.95 }}
-                             onClick={() => {
-                               setSearchQuery('');
-                               searchInputRef.current?.focus();
-                             }}
-                             className="px-6 py-2.5 bg-white/60 border border-white/40 rounded-full text-editorial-label text-black/80 hover:text-black hover:bg-white hover:shadow-md transition-all duration-300"
+                             onClick={() => { setSearchQuery(''); searchInputRef.current?.focus(); }}
+                             className="px-8 py-3 bg-black text-white rounded-full text-xs font-semibold tracking-widest uppercase shadow-xl hover:shadow-2xl hover:bg-gray-900 transition-all duration-300"
                            >
                              Limpar Busca
                            </motion.button>
@@ -479,77 +414,46 @@ const App: React.FC = () => {
                         filteredTemplates.map((template, index) => {
                           const normalize = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
                           const q = normalize(debouncedSearchQuery);
-                          const titleMatch = normalize(template.title).includes(q);
-                          const descMatch = normalize(template.description || '').includes(q);
-                          const isDeepMatch = debouncedSearchQuery && !titleMatch && !descMatch;
+                          const isDeepMatch = debouncedSearchQuery && !normalize(template.title).includes(q) && !normalize(template.description || '').includes(q);
 
                           return (
                           <motion.button
-                            // Removed layout="position" to prevent heavy recalculations on list
                             key={template.id}
-                            initial={{ opacity: 0, y: 15 }}
+                            initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.98 }}
-                            whileHover={{ scale: 1.005, backgroundColor: 'rgba(255,255,255,0.7)' }}
+                            whileHover={{ scale: 1.005, backgroundColor: 'rgba(255,255,255,0.9)' }}
                             whileTap={{ scale: 0.99 }}
-                            transition={{ 
-                              delay: index * 0.03,
-                              type: "spring", stiffness: 200, damping: 25 // Smoother
-                            }}
+                            transition={{ delay: index * 0.03, type: "spring", stiffness: 200, damping: 25 }}
                             onClick={() => setSelectedTemplate(template)}
                             className={`
-                              w-full text-left p-5 rounded-2xl transition-all duration-300 group relative
-                              ${selectedTemplate?.id === template.id 
-                                ? 'bg-white shadow-[0_8px_30px_-5px_rgba(0,0,0,0.04)] border border-white/60' 
-                                : 'border border-transparent hover:border-white/30'}
+                              w-full text-left p-6 rounded-2xl transition-all duration-300 group relative
+                              ${selectedTemplate?.id === template.id ? 'bg-white shadow-xl ring-1 ring-black/5 scale-[1.01]' : 'bg-white/0 border border-transparent hover:border-white/50 hover:shadow-sm'}
                             `}
                           >
-                            <div className="flex justify-between items-start mb-2.5">
-                              <div className="flex flex-wrap gap-1.5">
-                                <span className={`
-                                  text-editorial-label px-2 py-0.5 rounded border text-[9px] tracking-[0.1em]
-                                  ${selectedTemplate?.id === template.id 
-                                    ? 'bg-black text-white border-black' 
-                                    : 'bg-white/30 text-gray-400 border-white/20 group-hover:border-black/10 group-hover:text-gray-600'}
-                                  transition-colors duration-300
-                                `}>
-                                   {template.channel === 'EMAIL' ? 'Email' : (template.channel === 'PROMPT' ? 'Prompt' : 'Chat')}
-                                </span>
-                                {template.secondaryContent && (
-                                  <span className="text-editorial-label px-2 py-0.5 rounded border border-white/20 bg-blue-50/50 text-blue-800/70 text-[9px] tracking-[0.1em]">
-                                    + Protocolo
-                                  </span>
-                                )}
-                              </div>
-                              {selectedTemplate?.id === template.id && (
-                                 <motion.div layoutId="activeDot" className="w-1.5 h-1.5 rounded-full bg-black mt-1" />
-                              )}
+                            <div className="flex justify-between items-start mb-3">
+                              <span className={`text-[9px] font-sans tracking-[0.15em] uppercase px-2.5 py-1 rounded-md border transition-colors duration-300 ${selectedTemplate?.id === template.id ? 'bg-black text-white border-black' : 'bg-white/60 text-gray-400 border-black/5 group-hover:border-black/10 group-hover:text-black'}`}>
+                                 {template.channel === 'EMAIL' ? 'Email' : (template.channel === 'PROMPT' ? 'Prompt' : 'Chat')}
+                              </span>
+                              {selectedTemplate?.id === template.id && <motion.div layoutId="activeDot" className="w-1.5 h-1.5 rounded-full bg-black mt-1" />}
                             </div>
                             
-                            <h3 className={`
-                              font-serif text-xl italic leading-none mb-2 transition-colors
-                              ${selectedTemplate?.id === template.id ? 'text-black font-medium' : 'text-gray-800 font-light group-hover:text-black'}
-                            `}>
+                            <h3 className={`font-serif text-2xl italic leading-none mb-2 transition-colors ${selectedTemplate?.id === template.id ? 'text-black font-normal' : 'text-gray-900 font-light group-hover:text-black'}`}>
                               <HighlightedText text={template.title} highlight={debouncedSearchQuery} />
                             </h3>
-                            <p className={`
-                              text-[11px] font-sans leading-relaxed line-clamp-2 tracking-wide
-                              ${selectedTemplate?.id === template.id ? 'text-gray-600' : 'text-gray-400 group-hover:text-gray-500'}
-                            `}>
+                            <p className={`text-[11px] font-sans leading-relaxed line-clamp-2 tracking-wide font-light ${selectedTemplate?.id === template.id ? 'text-gray-600' : 'text-gray-400 group-hover:text-gray-500'}`}>
                               <HighlightedText text={template.description || ''} highlight={debouncedSearchQuery} />
                             </p>
 
                             {isDeepMatch && (
-                              <div className="mt-2 flex items-center gap-1.5">
-                                <FileText size={10} className="text-gray-400" />
-                                <span className="text-[9px] text-gray-400 font-medium bg-white/40 px-1.5 rounded-sm">
-                                  Encontrado no conteúdo
-                                </span>
+                              <div className="mt-3 flex items-center gap-1.5 opacity-60">
+                                <FileText size={10} strokeWidth={1} className="text-gray-400" />
+                                <span className="text-[9px] text-gray-400 tracking-wide">Encontrado no conteúdo</span>
                               </div>
                             )}
                           </motion.button>
                         );
-                        })}
+                        })
                       )}
                       </AnimatePresence>
                     </LayoutGroup>
@@ -557,39 +461,24 @@ const App: React.FC = () => {
                 </SmoothWrapper>
               </div>
               
-              <div className="px-6 py-4 border-t border-white/10 bg-white/5 backdrop-blur-md flex justify-between items-center z-10 rounded-b-3xl">
-                 <span className="text-editorial-label text-gray-400">
+              <div className="px-6 py-4 border-t border-white/10 bg-white/10 backdrop-blur-md flex justify-between items-center z-10 rounded-b-2xl">
+                 <span className="text-editorial-label text-gray-400 text-[9px]">
                     {filteredTemplates.length} {filteredTemplates.length === 1 ? 'item' : 'itens'}
                  </span>
-                 {debouncedSearchQuery && (
-                   <span className="text-[10px] text-gray-400 italic">
-                     filtrado
-                   </span>
-                 )}
               </div>
-
             </motion.div>
 
             <AnimatePresence mode="wait">
               {selectedTemplate ? (
                 <motion.div
-                  key="editor-panel"
-                  className={`
-                    flex-1 h-full min-w-0
-                    fixed inset-0 z-50 lg:static 
-                    bg-[#f5f5f7] lg:bg-transparent
-                    lg:rounded-3xl lg:border border-white/0
-                  `}
+                  key={selectedTemplate.id}
+                  className="flex-1 h-full min-w-0 fixed inset-0 z-50 lg:static bg-[#f5f5f7] lg:bg-transparent lg:rounded-2xl lg:border border-white/0"
                   variants={isMobile ? mobileEditorVariants : editorPanelVariants}
                   initial="initial"
                   animate="animate"
                   exit="exit"
                 >
-                   <Editor 
-                     key={selectedTemplate.id}
-                     template={selectedTemplate} 
-                     onClose={() => setSelectedTemplate(null)} 
-                   />
+                   <Editor template={selectedTemplate} onClose={() => setSelectedTemplate(null)} />
                 </motion.div>
               ) : (
                 !isMobile && (
@@ -601,20 +490,12 @@ const App: React.FC = () => {
                     transition={{ duration: 0.6, ease: "circOut" }}
                     className="hidden lg:flex flex-1 h-full flex-col items-center justify-center text-gray-300 select-none pointer-events-none p-4 text-center"
                   >
-                    <div className="w-px h-24 bg-gradient-to-b from-transparent via-black/5 to-transparent mb-8"></div>
-                    <h3 className="text-5xl font-serif italic text-black/5 mb-4 tracking-wide mix-blend-multiply">Studio</h3>
-                    <div className="flex items-center gap-4 opacity-50">
-                      <span className="h-px w-8 bg-black/10"></span>
-                      <p className="text-editorial-label text-black/30">
-                        Selecione um modelo
-                      </p>
-                      <span className="h-px w-8 bg-black/10"></span>
-                    </div>
+                    <h3 className="text-6xl font-serif italic text-black/5 mb-4 tracking-tight">Studio</h3>
+                    <p className="text-editorial-label text-black/20 tracking-[0.2em]">Selecione um modelo</p>
                   </motion.div>
                 )
               )}
             </AnimatePresence>
-
           </div>
         </main>
       </div>

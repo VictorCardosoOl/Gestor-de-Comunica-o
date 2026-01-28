@@ -1,11 +1,11 @@
-import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
-import gsap from 'gsap';
-import './StaggeredMenu.css';
+
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence, Variants } from 'framer-motion';
+import { X, Menu } from 'lucide-react';
 
 interface MenuItem {
   label: string;
   id: string;
-  ariaLabel?: string;
 }
 
 interface StaggeredMenuProps {
@@ -15,247 +15,165 @@ interface StaggeredMenuProps {
   socialItems?: { label: string; link: string }[];
 }
 
+const menuVariants: Variants = {
+  closed: {
+    clipPath: "circle(0% at calc(100% - 3rem) 3rem)",
+    transition: {
+      type: "spring",
+      stiffness: 400,
+      damping: 40,
+      staggerDirection: -1
+    }
+  },
+  open: {
+    clipPath: "circle(150% at calc(100% - 3rem) 3rem)",
+    transition: {
+      type: "spring",
+      stiffness: 200,
+      damping: 30,
+      staggerChildren: 0.1,
+      delayChildren: 0.2
+    }
+  }
+};
+
+const itemVariants: Variants = {
+  closed: { opacity: 0, y: 20, transition: { duration: 0.2 } },
+  open: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+};
+
+const socialVariants: Variants = {
+  closed: { opacity: 0, y: 10 },
+  open: { opacity: 1, y: 0 }
+};
+
 export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
-  items = [],
+  items,
   activeId,
   onSelectItem,
-  socialItems = [],
+  socialItems = []
 }) => {
-  const [open, setOpen] = useState(false);
-  const openRef = useRef(false);
-  
-  // Refs for DOM elements
-  const panelRef = useRef<HTMLDivElement>(null);
-  const preLayersRef = useRef<HTMLDivElement>(null);
-  const toggleBtnRef = useRef<HTMLButtonElement>(null);
-  const plusHRef = useRef<HTMLSpanElement>(null);
-  const plusVRef = useRef<HTMLSpanElement>(null);
-  const iconRef = useRef<HTMLSpanElement>(null);
-  const textInnerRef = useRef<HTMLSpanElement>(null);
-  
-  // Refs for Animations
-  const openTlRef = useRef<gsap.core.Timeline | null>(null);
-  const closeTweenRef = useRef<gsap.core.Tween | null>(null);
-  
-  // State for button text animation
-  const [textLines, setTextLines] = useState(['Menu', 'Fechar']);
+  const [isOpen, setIsOpen] = useState(false);
 
-  // --- INITIAL SETUP ---
-  useLayoutEffect(() => {
-    const ctx = gsap.context(() => {
-      const panel = panelRef.current;
-      const preContainer = preLayersRef.current;
-      
-      if (!panel || !preContainer) return;
-
-      const preLayers = gsap.utils.toArray('.sm-prelayer') as HTMLElement[];
-      const offscreen = 100; // Right side
-
-      gsap.set([panel, ...preLayers], { xPercent: offscreen });
-      gsap.set(plusHRef.current, { transformOrigin: '50% 50%', rotate: 0 });
-      gsap.set(plusVRef.current, { transformOrigin: '50% 50%', rotate: 90 });
-      gsap.set(textInnerRef.current, { yPercent: 0 });
-    });
-    return () => ctx.revert();
-  }, []);
-
-  // --- BUILD TIMELINE ---
-  const buildOpenTimeline = useCallback(() => {
-    const panel = panelRef.current;
-    if (!panel) return null;
-
-    // Cleanup previous animations
-    openTlRef.current?.kill();
-    closeTweenRef.current?.kill();
-    
-    // Select dynamic elements
-    const layers = gsap.utils.toArray('.sm-prelayer') as HTMLElement[];
-    const itemEls = gsap.utils.toArray('.sm-panel-itemLabel') as HTMLElement[];
-    const numberEls = gsap.utils.toArray('.sm-panel-item') as HTMLElement[]; // Using item wrapper for numbers
-    const socialLinks = gsap.utils.toArray('.sm-socials-link') as HTMLElement[];
-    const socialTitle = panel.querySelector('.sm-socials-title');
-
-    // Reset properties for entry
-    gsap.set(itemEls, { yPercent: 120, rotate: 3 }); // Reduzido rotação/deslocamento
-    gsap.set(numberEls, { '--sm-num-opacity': 0 });
-    if (socialTitle) gsap.set(socialTitle, { opacity: 0 });
-    gsap.set(socialLinks, { y: 15, opacity: 0 });
-
-    const tl = gsap.timeline({ paused: true });
-
-    // 1. Wipe Layers (Smoother)
-    layers.forEach((el, i) => {
-      tl.to(el, { xPercent: 0, duration: 0.6, ease: 'power3.inOut' }, i * 0.08);
-    });
-
-    // 2. Panel Entry (Smoother)
-    const panelStart = layers.length * 0.08;
-    tl.to(panel, { xPercent: 0, duration: 0.7, ease: 'power3.out' }, panelStart);
-
-    // 3. Items Stagger (Clean, not frantic)
-    const contentStart = panelStart + 0.3;
-    if (itemEls.length) {
-      tl.to(itemEls, {
-        yPercent: 0,
-        rotate: 0,
-        duration: 0.8,
-        ease: 'power2.out', // Mais suave que power3/4
-        stagger: 0.04
-      }, contentStart);
-
-      tl.to(numberEls, {
-        '--sm-num-opacity': 1,
-        duration: 0.5,
-        stagger: 0.04
-      }, contentStart + 0.1);
-    }
-
-    // 4. Socials
-    if (socialLinks.length) {
-       tl.to([socialTitle, ...socialLinks], {
-         y: 0,
-         opacity: 1,
-         duration: 0.6,
-         stagger: 0.04
-       }, contentStart + 0.3);
-    }
-
-    openTlRef.current = tl;
-    return tl;
-  }, []);
-
-  // --- ACTIONS ---
-  const toggleMenu = useCallback(() => {
-    const willOpen = !openRef.current;
-    openRef.current = willOpen;
-    setOpen(willOpen);
-
-    // Animate Button Text
-    const inner = textInnerRef.current;
-    if (inner) {
-        // Cycle logic: Menu -> Close -> Menu
-        const targetLabel = willOpen ? 'Fechar' : 'Menu';
-        const newSeq = [willOpen ? 'Menu' : 'Fechar', '...', targetLabel];
-        setTextLines(newSeq);
-        
-        gsap.killTweensOf(inner);
-        gsap.set(inner, { yPercent: 0 });
-        gsap.to(inner, {
-            yPercent: -66.6, // Move up 2 lines
-            duration: 0.8, // Slower for elegance
-            ease: 'power4.inOut'
-        });
-    }
-
-    // Animate Icon
-    if (iconRef.current) {
-        gsap.to(iconRef.current, {
-            rotate: willOpen ? 135 : 0,
-            duration: 0.5,
-            ease: 'back.out(1.5)'
-        });
-    }
-
-    // Play Main Animation
-    if (willOpen) {
-        const tl = buildOpenTimeline();
-        tl?.play();
+  // Prevent scrolling when menu is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
     } else {
-        // Close Sequence (Cleaner)
-        openTlRef.current?.kill();
-        const panel = panelRef.current;
-        const layers = gsap.utils.toArray('.sm-prelayer') as HTMLElement[];
-        
-        if (panel) {
-            closeTweenRef.current = gsap.to([panel, ...layers], {
-                xPercent: 100,
-                duration: 0.5,
-                ease: 'power3.inOut',
-                stagger: { amount: 0.15, from: "end" } // Reverse order
-            });
-        }
+      document.body.style.overflow = '';
     }
-  }, [buildOpenTimeline]);
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
 
-  const handleItemClick = (id: string) => {
-    onSelectItem(id);
-    toggleMenu(); // Close after selection
-  };
+  const toggleMenu = () => setIsOpen(!isOpen);
 
   return (
-    <div className="staggered-menu-wrapper" data-open={open}>
-      {/* Wipe Layers - Using Editorial Colors */}
-      <div ref={preLayersRef} className="sm-prelayers">
-         <div className="sm-prelayer" style={{ background: '#e5e5e5' }} />
-         <div className="sm-prelayer" style={{ background: '#d4d4d4' }} />
-         <div className="sm-prelayer" style={{ background: '#111111' }} /> 
-      </div>
+    <>
+      {/* Toggle Button - Always Visible & Top Level Z-Index */}
+      <button 
+        onClick={toggleMenu}
+        className="fixed top-4 right-4 z-[9999] p-3 bg-white/80 backdrop-blur-md border border-black/5 rounded-full shadow-sm active:scale-95 transition-transform"
+        aria-label={isOpen ? "Fechar Menu" : "Abrir Menu"}
+      >
+        <div className="relative w-6 h-6 flex items-center justify-center text-black">
+          <AnimatePresence mode="popLayout">
+            {isOpen ? (
+              <motion.div 
+                key="close"
+                initial={{ rotate: -90, opacity: 0 }}
+                animate={{ rotate: 0, opacity: 1 }}
+                exit={{ rotate: 90, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <X size={24} strokeWidth={1.5} />
+              </motion.div>
+            ) : (
+              <motion.div 
+                key="menu"
+                initial={{ rotate: 90, opacity: 0 }}
+                animate={{ rotate: 0, opacity: 1 }}
+                exit={{ rotate: -90, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <Menu size={24} strokeWidth={1.5} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </button>
 
-      <header className="staggered-menu-header">
-        {/* Placeholder for alignment */}
-        <div /> 
-        
-        <button
-          ref={toggleBtnRef}
-          className="sm-toggle text-black bg-white/50"
-          onClick={toggleMenu}
-        >
-          <span className="sm-toggle-textWrap">
-            <span ref={textInnerRef} className="sm-toggle-textInner">
-              {textLines.map((l, i) => (
-                <span key={i} className="leading-none block h-full flex items-center justify-end">{l}</span>
-              ))}
-            </span>
-          </span>
-          <span ref={iconRef} className="sm-icon text-black">
-            <span ref={plusHRef} className="sm-icon-line" />
-            <span ref={plusVRef} className="sm-icon-line" />
-          </span>
-        </button>
-      </header>
+      {/* Full Screen Menu Overlay */}
+      <motion.div
+        initial="closed"
+        animate={isOpen ? "open" : "closed"}
+        variants={menuVariants}
+        className="fixed inset-0 z-[9990] bg-[#f5f5f7] flex flex-col justify-center px-8"
+        style={{ pointerEvents: isOpen ? 'auto' : 'none' }}
+      >
+        <div className="max-w-md w-full mx-auto flex flex-col h-full justify-center">
+          {/* Main Navigation */}
+          <nav className="flex flex-col gap-6">
+            <motion.button
+              variants={itemVariants}
+              onClick={() => {
+                onSelectItem('all');
+                setIsOpen(false);
+              }}
+              className="text-left group"
+            >
+               <span className="block text-xs font-sans font-medium text-gray-400 tracking-widest uppercase mb-1">00</span>
+               <span className={`text-4xl md:text-5xl font-serif italic ${activeId === 'all' ? 'text-black' : 'text-gray-400 group-hover:text-gray-600'} transition-colors duration-300`}>
+                 Visão Geral
+               </span>
+            </motion.button>
 
-      <aside ref={panelRef} className="staggered-menu-panel">
-        <div className="sm-panel-inner">
-          <ul className="sm-panel-list" data-numbering="true">
-             <li className="sm-panel-itemWrap">
-                <button 
-                    className={`sm-panel-item ${activeId === 'all' ? 'text-black opacity-100' : 'text-gray-500'}`}
-                    onClick={() => handleItemClick('all')}
-                    data-index="00"
-                >
-                    <span className="sm-panel-itemLabel">Visão Geral</span>
-                </button>
-             </li>
-             {items.map((item, idx) => (
-                <li className="sm-panel-itemWrap" key={item.id}>
-                  <button 
-                    className={`sm-panel-item ${activeId === item.id ? 'text-black opacity-100' : 'text-gray-500'}`}
-                    onClick={() => handleItemClick(item.id)}
-                    data-index={`0${idx + 1}`}
-                  >
-                    <span className="sm-panel-itemLabel">{item.label}</span>
-                  </button>
-                </li>
-             ))}
-          </ul>
+            {items.map((item, idx) => (
+              <motion.button
+                key={item.id}
+                variants={itemVariants}
+                onClick={() => {
+                  onSelectItem(item.id);
+                  setIsOpen(false);
+                }}
+                className="text-left group"
+              >
+                 <span className="block text-xs font-sans font-medium text-gray-400 tracking-widest uppercase mb-1">
+                   {String(idx + 1).padStart(2, '0')}
+                 </span>
+                 <span className={`text-4xl md:text-5xl font-serif italic ${activeId === item.id ? 'text-black' : 'text-gray-400 group-hover:text-gray-600'} transition-colors duration-300`}>
+                   {item.label}
+                 </span>
+              </motion.button>
+            ))}
+          </nav>
 
+          {/* Footer Socials */}
           {socialItems.length > 0 && (
-            <div className="sm-socials">
-              <h3 className="sm-socials-title">Atalhos</h3>
-              <ul className="sm-socials-list">
-                {socialItems.map((s, i) => (
-                  <li key={i}>
-                    <a href={s.link} className="sm-socials-link hover:underline underline-offset-4">
-                      {s.label}
-                    </a>
-                  </li>
+            <motion.div 
+              variants={socialVariants}
+              className="mt-12 pt-8 border-t border-black/5"
+            >
+              <h3 className="text-xs font-sans uppercase tracking-widest text-gray-400 mb-4">Atalhos</h3>
+              <div className="flex gap-6">
+                {socialItems.map((social, idx) => (
+                  <a 
+                    key={idx}
+                    href={social.link}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm font-sans text-black hover:opacity-60 transition-opacity"
+                  >
+                    {social.label}
+                  </a>
                 ))}
-              </ul>
-            </div>
+              </div>
+            </motion.div>
           )}
         </div>
-      </aside>
-    </div>
+      </motion.div>
+    </>
   );
 };
 

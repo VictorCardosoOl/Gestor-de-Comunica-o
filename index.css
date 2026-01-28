@@ -1,24 +1,25 @@
+
 :root {
   /* Fonts */
   --font-serif: 'Cormorant Garamond', serif;
   --font-sans: 'Inter', sans-serif;
 
   /* Theme Colors */
-  --color-bg-base: #f0f0f2;
-  --color-text-primary: #111111;
-  --color-text-secondary: #2a2a2a;
+  --color-bg-base: #f4f4f5; /* Slightly cooler gray for premium feel */
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #4a4a4a;
   
-  /* Gradient Ambient */
-  --grad-1: rgba(255, 255, 255, 0.7);
-  --grad-2: rgba(225, 228, 235, 0.5);
-  --grad-3: rgba(215, 218, 225, 0.4);
-  --grad-4: rgba(235, 238, 242, 0.6);
+  /* Gradient Ambient - Softer, more diffuse */
+  --grad-1: rgba(255, 255, 255, 0.8);
+  --grad-2: rgba(230, 232, 236, 0.6);
+  --grad-3: rgba(220, 222, 228, 0.5);
+  --grad-4: rgba(240, 242, 245, 0.7);
 }
 
 html, body {
   height: 100%;
   width: 100%;
-  overflow: hidden; /* App-like structure */
+  overflow: hidden;
   overscroll-behavior: none;
 }
 
@@ -29,12 +30,11 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   
-  /* Centralized Background Gradient */
   background-image: 
-    radial-gradient(at 10% 10%, var(--grad-1) 0px, transparent 60%),
-    radial-gradient(at 90% 10%, var(--grad-2) 0px, transparent 50%),
-    radial-gradient(at 90% 90%, var(--grad-3) 0px, transparent 50%),
-    radial-gradient(at 10% 90%, var(--grad-4) 0px, transparent 50%);
+    radial-gradient(at 0% 0%, var(--grad-1) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, var(--grad-2) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, var(--grad-3) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, var(--grad-4) 0px, transparent 50%);
   background-attachment: fixed;
   background-size: cover;
 }
@@ -42,11 +42,11 @@ body {
 /* Scrollbar Editorial - Minimalist */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(0,0,0,0.1) transparent;
+  scrollbar-color: rgba(0,0,0,0.05) transparent;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
+  width: 3px; /* Thinner */
 }
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent; 
@@ -57,10 +57,10 @@ body {
   transition: background 0.3s ease;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(0,0,0,0.25); 
+  background: rgba(0,0,0,0.2); 
 }
 
-/* Typography Utilities */
+/* Typography Utilities - REFINED */
 .font-serif { font-family: var(--font-serif); }
 .font-sans { font-family: var(--font-sans); }
 
@@ -68,30 +68,37 @@ body {
   font-family: var(--font-serif);
   font-style: italic;
   font-weight: 300; 
-  letter-spacing: -0.025em;
-  line-height: 1.05;
-  font-size: clamp(2.25rem, 4vw, 4rem); 
+  letter-spacing: -0.03em; /* Tighter tracking for display text */
+  line-height: 1;
+  font-size: clamp(2.5rem, 5vw, 4.5rem); /* Larger presence */
 }
 
 .text-editorial-label {
   font-family: var(--font-sans);
   font-weight: 500;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.15em; /* Wider spacing for labels */
   text-transform: uppercase;
-  font-size: 0.65rem; 
-  line-height: 1.5;
+  font-size: 0.625rem; /* Smaller, sharper */
+  line-height: 1.4;
 }
 
 .text-editorial-body {
   font-family: var(--font-sans);
-  font-weight: 300;
+  font-weight: 300; /* Lighter body text */
   letter-spacing: 0.01em;
-  line-height: 1.65;
-  font-size: clamp(0.95rem, 1vw, 1.05rem);
+  line-height: 1.75; /* Generous leading */
+  font-size: clamp(0.9rem, 1vw, 1rem);
   color: var(--color-text-secondary);
 }
 
 ::selection {
-  background: rgba(0, 0, 0, 0.08);
+  background: rgba(0, 0, 0, 0.06);
   color: #000;
+}
+
+/* Input Resets for Editorial Feel */
+input::placeholder, textarea::placeholder {
+  color: rgba(0,0,0,0.2) !important;
+  font-style: italic;
+  font-weight: 300;
 }

@@ -1,14 +1,23 @@
 
 import { GoogleGenAI } from "@google/genai";
 
+if (!process.env.API_KEY) {
+  console.warn("Gemini API Key is missing. AI features will not work.");
+}
+
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 /**
  * Refines the provided text using Gemini, ensuring placeholders are preserved.
+ * Uses strict prompt engineering to maintain variable integrity.
+ * 
  * @param text The text content to refine.
  * @param instruction Additional instructions (e.g., tone, channel).
+ * @returns The refined text or the original text if the operation fails.
  */
 export const refineText = async (text: string, instruction: string): Promise<string> => {
+  if (!text.trim()) return text;
+
   try {
     const prompt = `
       Você é um assistente editorial especializado em comunicação corporativa técnica.
@@ -38,14 +47,14 @@ export const refineText = async (text: string, instruction: string): Promise<str
       model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
-        temperature: 0.3, // Baixa temperatura para seguir regras estritas
+        temperature: 0.3,
       }
     });
 
     return response.text || text;
   } catch (error) {
-    console.error("Erro ao refinar texto com Gemini:", error);
-    // Em caso de erro, retorna o texto original para não quebrar o fluxo
+    // In production, send this to an observability service (e.g., Sentry)
+    // console.error("AI Service Error", error); 
     return text;
   }
 };
