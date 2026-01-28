@@ -1,4 +1,4 @@
-const CACHE_NAME = 'quickcomms-studio-v1';
+const CACHE_NAME = 'quickcomms-studio-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -29,40 +29,24 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+// Stale-While-Revalidate Strategy
 self.addEventListener('fetch', (event) => {
-  // Guard clause: ensure caches API is available (fixes 'undefined (reading match)' error)
-  if (typeof caches === 'undefined') {
-    return;
-  }
+  if (typeof caches === 'undefined') return;
+  if (event.request.method !== 'GET') return;
 
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-
-      return fetch(event.request).then((response) => {
-        // Check if we received a valid response
-        if (!response || response.status !== 200 || response.type === 'error') {
-          return response;
-        }
-
-        // Clone the response
-        const responseToCache = response.clone();
-
-        caches.open(CACHE_NAME).then((cache) => {
-          // We can't cache POST requests or opaque responses in some cases, 
-          // but for GET requests to CDN assets (scripts, styles, fonts), this helps offline support.
-          if (event.request.method === 'GET') {
-             try {
-                cache.put(event.request, responseToCache);
-             } catch (err) {
-                // Ignore errors (e.g. quota exceeded or unsupported scheme)
-             }
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.match(event.request).then((cachedResponse) => {
+        const fetchPromise = fetch(event.request).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200 && networkResponse.type !== 'error') {
+            cache.put(event.request, networkResponse.clone());
           }
+          return networkResponse;
+        }).catch(() => {
+          // Network failure - nothing to do if no cache
         });
 
-        return response;
+        return cachedResponse || fetchPromise;
       });
     })
   );

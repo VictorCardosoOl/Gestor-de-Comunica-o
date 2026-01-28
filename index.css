@@ -4,16 +4,16 @@
   --font-serif: 'Cormorant Garamond', serif;
   --font-sans: 'Inter', sans-serif;
 
-  /* Theme Colors */
-  --color-bg-base: #f4f4f5; /* Slightly cooler gray for premium feel */
-  --color-text-primary: #1a1a1a;
-  --color-text-secondary: #4a4a4a;
+  /* Theme Colors - High Contrast Adjusted */
+  --color-bg-base: #f4f4f5; 
+  --color-text-primary: #111111; /* Darker black */
+  --color-text-secondary: #4b5563; /* Darker gray (Tailwind gray-600 equivalent) for WCAG */
   
-  /* Gradient Ambient - Softer, more diffuse */
-  --grad-1: rgba(255, 255, 255, 0.8);
-  --grad-2: rgba(230, 232, 236, 0.6);
-  --grad-3: rgba(220, 222, 228, 0.5);
-  --grad-4: rgba(240, 242, 245, 0.7);
+  /* Gradient Ambient - Reduced Opacity for Performance */
+  --grad-1: rgba(255, 255, 255, 0.9);
+  --grad-2: rgba(230, 232, 236, 0.8);
+  --grad-3: rgba(220, 222, 228, 0.7);
+  --grad-4: rgba(240, 242, 245, 0.8);
 }
 
 html, body {
@@ -30,75 +30,80 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   
+  /* Simplified background for performance */
   background-image: 
     radial-gradient(at 0% 0%, var(--grad-1) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, var(--grad-2) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, var(--grad-3) 0px, transparent 50%),
-    radial-gradient(at 0% 100%, var(--grad-4) 0px, transparent 50%);
+    radial-gradient(at 100% 100%, var(--grad-4) 0px, transparent 50%);
   background-attachment: fixed;
   background-size: cover;
+}
+
+/* Accessibility: Focus Visible */
+:focus-visible {
+  outline: 2px solid #000;
+  outline-offset: 2px;
 }
 
 /* Scrollbar Editorial - Minimalist */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(0,0,0,0.05) transparent;
+  scrollbar-color: rgba(0,0,0,0.1) transparent;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 3px; /* Thinner */
+  width: 4px; 
 }
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent; 
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(0,0,0,0.1); 
+  background: rgba(0,0,0,0.15); 
   border-radius: 10px;
-  transition: background 0.3s ease;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(0,0,0,0.2); 
+  background: rgba(0,0,0,0.3); 
 }
 
-/* Typography Utilities - REFINED */
+/* Typography Utilities */
 .font-serif { font-family: var(--font-serif); }
 .font-sans { font-family: var(--font-sans); }
 
 .text-editorial-title {
   font-family: var(--font-serif);
   font-style: italic;
-  font-weight: 300; 
-  letter-spacing: -0.03em; /* Tighter tracking for display text */
+  font-weight: 400; /* Increased weight for readability */
+  letter-spacing: -0.02em; 
   line-height: 1;
-  font-size: clamp(2.5rem, 5vw, 4.5rem); /* Larger presence */
+  font-size: clamp(2.5rem, 5vw, 4.5rem); 
 }
 
 .text-editorial-label {
   font-family: var(--font-sans);
-  font-weight: 500;
-  letter-spacing: 0.15em; /* Wider spacing for labels */
+  font-weight: 600; /* Increased weight */
+  letter-spacing: 0.1em; 
   text-transform: uppercase;
-  font-size: 0.625rem; /* Smaller, sharper */
+  font-size: 0.65rem; 
   line-height: 1.4;
+  color: #6b7280; /* Accessible gray */
 }
 
 .text-editorial-body {
   font-family: var(--font-sans);
-  font-weight: 300; /* Lighter body text */
+  font-weight: 400; /* Standard weight instead of light */
   letter-spacing: 0.01em;
-  line-height: 1.75; /* Generous leading */
-  font-size: clamp(0.9rem, 1vw, 1rem);
+  line-height: 1.6; 
+  font-size: clamp(0.95rem, 1vw, 1.05rem);
   color: var(--color-text-secondary);
 }
 
 ::selection {
-  background: rgba(0, 0, 0, 0.06);
+  background: rgba(0, 0, 0, 0.1);
   color: #000;
 }
 
-/* Input Resets for Editorial Feel */
+/* Input Resets */
 input::placeholder, textarea::placeholder {
-  color: rgba(0,0,0,0.2) !important;
+  color: #9ca3af !important; /* Tailwind gray-400 - darker than before */
   font-style: italic;
-  font-weight: 300;
+  font-weight: 400;
 }
