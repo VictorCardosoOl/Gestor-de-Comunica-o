@@ -1,20 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { CATEGORIES } from '../constants';
 import { 
+  LayoutTemplate,
   GalleryVerticalEnd,
   Layers,
   Calendar,
   SlidersHorizontal,
   Users,
-  Pin,
-  PinOff,
-  Download,
-  Command,
   Sparkles,
-  LayoutTemplate
+  Command
 } from 'lucide-react';
 import { Category } from '../types';
-import { motion, AnimatePresence, LayoutGroup, Variants } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface SidebarProps {
   selectedCategory: string;
@@ -22,8 +19,6 @@ interface SidebarProps {
   isOpen: boolean; 
   onCloseMobile: () => void;
   isMobile: boolean; 
-  isPinned: boolean;
-  onTogglePin: () => void;
 }
 
 const IconMap: Record<string, React.FC<any>> = {
@@ -34,59 +29,14 @@ const IconMap: Record<string, React.FC<any>> = {
   Sparkles: Sparkles
 };
 
-// Faster, crisper animations
-const itemVariants: Variants = {
-  hidden: { opacity: 0, x: -10 },
-  visible: { 
-    opacity: 1, 
-    x: 0, 
-    transition: { duration: 0.2, ease: "easeOut" }
-  }
-};
-
 export const Sidebar: React.FC<SidebarProps> = ({ 
   selectedCategory, 
   onSelectCategory, 
   isOpen,
   onCloseMobile,
   isMobile,
-  isPinned,
-  onTogglePin
 }) => {
-  const [isHovered, setIsHovered] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-
-  const isExpanded = isMobile ? true : (isPinned || isHovered);
-
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (e: any) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-  }, []);
-
-  const handleInstallClick = () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.then((choiceResult: any) => {
-        if (choiceResult.outcome === 'accepted') setDeferredPrompt(null);
-      });
-    }
-  };
-
-  const sidebarVariants = {
-    mobileClosed: { x: "-100%", width: "16rem", transition: { duration: 0.2 } },
-    mobileOpen: { x: "0%", width: "16rem", transition: { type: "spring", stiffness: 300, damping: 30 } },
-    desktopCollapsed: { width: "4.5rem", transition: { duration: 0.2, ease: "easeInOut" } },
-    desktopExpanded: { width: "16rem", transition: { duration: 0.2, ease: "easeInOut" } }
-  };
-
-  const getCurrentVariant = () => {
-    if (isMobile) return isOpen ? "mobileOpen" : "mobileClosed";
-    return isExpanded ? "desktopExpanded" : "desktopCollapsed";
-  };
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   return (
     <>
@@ -96,151 +46,113 @@ export const Sidebar: React.FC<SidebarProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/10 z-[60]"
+            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[60]"
             onClick={onCloseMobile}
           />
         )}
       </AnimatePresence>
 
       <motion.aside 
-        initial={false}
-        animate={getCurrentVariant()}
-        variants={sidebarVariants}
         className={`
-          fixed inset-y-0 left-0 z-[70]
-          flex flex-col h-full 
-          bg-white border-r border-gray-200
-          shadow-sm
+          fixed z-[70] flex flex-col items-center
+          ${isMobile ? 'inset-y-0 left-0 w-20 bg-white border-r border-[#e6e4e1]' : 'left-4 top-4 bottom-4 w-16 bg-white/50 backdrop-blur-xl rounded-[24px] border border-white/40 shadow-sm'}
         `}
-        onMouseEnter={() => !isMobile && setIsHovered(true)}
-        onMouseLeave={() => !isMobile && setIsHovered(false)}
+        initial={false}
+        animate={isMobile ? { x: isOpen ? 0 : "-100%" } : { x: 0 }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
       >
-        {!isMobile && (
-          <div className="absolute -right-3 top-6 z-50">
-            <AnimatePresence>
-              {isExpanded && (
-                <motion.button 
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  onClick={onTogglePin}
-                  className="w-6 h-6 flex items-center justify-center bg-white border border-gray-200 shadow-sm rounded-full text-gray-400 hover:text-black hover:border-gray-300 transition-all"
-                >
-                  {isPinned ? <Pin size={10} strokeWidth={2} /> : <PinOff size={10} strokeWidth={2} />}
-                </motion.button>
-              )}
-            </AnimatePresence>
-          </div>
-        )}
-
         {/* Brand */}
-        <div className="h-16 flex items-center px-4 shrink-0 border-b border-transparent">
-           <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-black text-white shrink-0">
-              <Command size={18} />
+        <div className="h-20 flex items-center justify-center shrink-0">
+           <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-[#1a1918] text-white shadow-lg">
+              <Command size={20} strokeWidth={1.5} />
            </div>
-          
-          <AnimatePresence>
-            {isExpanded && (
-              <motion.div
-                initial={{ opacity: 0, x: -5 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                className="ml-3 overflow-hidden whitespace-nowrap"
-              >
-                <h1 className="font-semibold text-gray-900 tracking-tight">QuickComms</h1>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
 
         {/* Nav */}
-        <LayoutGroup id="sidebar-nav">
-          <nav className="flex-1 overflow-y-auto px-3 py-4 custom-scrollbar flex flex-col gap-0.5">
-              <SidebarItem 
-                id="all"
-                label="Visão Geral"
-                icon={LayoutTemplate}
-                isSelected={selectedCategory === 'all'}
-                isExpanded={isExpanded}
+        <nav className="flex-1 flex flex-col gap-3 w-full px-2 py-4 overflow-y-auto custom-scrollbar no-scrollbar">
+            <DockItem 
+              id="all"
+              label="Overview"
+              icon={LayoutTemplate}
+              isSelected={selectedCategory === 'all'}
+              onClick={() => {
+                onSelectCategory('all');
+                if (isMobile) onCloseMobile();
+              }}
+              hoveredId={hoveredId}
+              setHoveredId={setHoveredId}
+            />
+
+            <div className="w-8 h-px bg-[#e6e4e1] mx-auto my-2 opacity-50" />
+
+            {CATEGORIES.map((cat: Category) => (
+              <DockItem 
+                key={cat.id}
+                id={cat.id}
+                label={cat.name}
+                icon={IconMap[cat.icon] || GalleryVerticalEnd}
+                isSelected={selectedCategory === cat.id}
                 onClick={() => {
-                  onSelectCategory('all');
+                  onSelectCategory(cat.id);
                   if (isMobile) onCloseMobile();
                 }}
+                hoveredId={hoveredId}
+                setHoveredId={setHoveredId}
               />
-
-              <div className="my-2 border-b border-gray-100 mx-2" />
-
-              {CATEGORIES.map((cat: Category) => (
-                <SidebarItem 
-                  key={cat.id}
-                  id={cat.id}
-                  label={cat.name}
-                  icon={IconMap[cat.icon] || GalleryVerticalEnd}
-                  isSelected={selectedCategory === cat.id}
-                  isExpanded={isExpanded}
-                  onClick={() => {
-                    onSelectCategory(cat.id);
-                    if (isMobile) onCloseMobile();
-                  }}
-                />
-              ))}
-          </nav>
-        </LayoutGroup>
-
-        {/* Footer */}
-        {deferredPrompt && isExpanded && (
-          <div className="p-4 border-t border-gray-100 bg-gray-50/50">
-              <button
-              onClick={handleInstallClick}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-sm"
-            >
-              <Download size={14} />
-              <span>Instalar App</span>
-            </button>
-          </div>
-        )}
+            ))}
+        </nav>
       </motion.aside>
-      
-      {!isMobile && (
-        <motion.div 
-          className="shrink-0 hidden lg:block"
-          initial={false}
-          animate={{ width: isExpanded ? "16rem" : "4.5rem" }}
-          transition={{ duration: 0.2, ease: "easeInOut" }}
-        />
-      )}
     </>
   );
 };
 
-const SidebarItem: React.FC<{
+const DockItem: React.FC<{
   id: string;
   label: string;
   icon: any;
   isSelected: boolean;
-  isExpanded: boolean;
+  hoveredId: string | null;
+  setHoveredId: (id: string | null) => void;
   onClick: () => void;
-}> = ({ label, icon: Icon, isSelected, isExpanded, onClick }) => {
+}> = ({ id, label, icon: Icon, isSelected, hoveredId, setHoveredId, onClick }) => {
+  const isHovered = hoveredId === id;
+
   return (
-    <button
-      onClick={onClick}
-      className={`
-        relative w-full flex items-center rounded-md z-10 group
-        ${!isExpanded ? 'justify-center h-10' : 'px-3 h-10 gap-3'}
-        transition-colors duration-150
-        ${isSelected ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}
-      `}
-    >
-      <span className="shrink-0 flex items-center justify-center">
-        <Icon size={18} strokeWidth={isSelected ? 2 : 1.5} className="transition-all" />
-      </span>
-      
-      {isExpanded && (
-        <span className={`text-sm whitespace-nowrap overflow-hidden ${isSelected ? 'font-medium' : 'font-normal'}`}>
-          {label}
-        </span>
-      )}
-    </button>
+    <div className="relative flex items-center justify-center group">
+      {/* Tooltip (Desktop Only) */}
+      <AnimatePresence>
+        {isHovered && (
+          <motion.div 
+            initial={{ opacity: 0, x: 10, scale: 0.9 }}
+            animate={{ opacity: 1, x: 20, scale: 1 }}
+            exit={{ opacity: 0, x: 10, scale: 0.9 }}
+            className="absolute left-full bg-[#1a1918] text-white text-[10px] font-medium tracking-wider uppercase px-2 py-1 rounded-md whitespace-nowrap z-50 pointer-events-none"
+          >
+            {label}
+            {/* Tiny arrow */}
+            <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-[#1a1918] rotate-45" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <button
+        onClick={onClick}
+        onMouseEnter={() => setHoveredId(id)}
+        onMouseLeave={() => setHoveredId(null)}
+        className={`
+          relative w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-300
+          ${isSelected ? 'bg-white shadow-md text-black' : 'text-gray-400 hover:text-gray-900 hover:bg-white/50'}
+        `}
+      >
+        <Icon size={20} strokeWidth={1.5} className={`transition-transform duration-300 ${isHovered ? 'scale-110' : 'scale-100'}`} />
+        
+        {isSelected && (
+          <motion.div 
+            layoutId="active-dot"
+            className="absolute -right-1 top-1 w-2 h-2 bg-black rounded-full border-2 border-white"
+          />
+        )}
+      </button>
+    </div>
   );
 }

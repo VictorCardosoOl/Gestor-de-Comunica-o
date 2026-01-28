@@ -5,7 +5,6 @@ import { useEditorLogic } from '../hooks/useEditorLogic';
 import { EditorHeader, VariablePanel, ContentArea } from './EditorComponents';
 import { Copy, Check, Layers, X } from 'lucide-react';
 import { useTemplateCopier } from '../hooks/useTemplateCopier';
-import { MagneticButton } from './MagneticButton';
 
 interface EditorProps {
   template: Template;
@@ -38,24 +37,22 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
   }, []);
 
   return (
-    <div className="h-full flex flex-col bg-white relative overflow-hidden">
-      {/* Header (Top) */}
-      <div className="z-20 relative border-b border-gray-200">
-        <EditorHeader 
-          template={template} 
-          onClose={onClose} 
-          showVariables={showVariables}
-          onToggleVariables={() => setShowVariables(!showVariables)}
-          onReset={handleReset}
-          hasVariables={hasVariables}
-        />
-      </div>
+    <div className="h-full flex flex-col relative overflow-hidden bg-[#fdfcfb]">
+      {/* Header */}
+      <EditorHeader 
+        template={template} 
+        onClose={onClose} 
+        showVariables={showVariables}
+        onToggleVariables={() => setShowVariables(!showVariables)}
+        onReset={handleReset}
+        hasVariables={hasVariables}
+      />
 
       {/* Main Layout */}
       <div className="flex-1 flex overflow-hidden relative">
         
-        {/* Content Area */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar relative bg-gray-50/30"> 
+        {/* Content Area (Scrollable) */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar relative"> 
            <ContentArea 
              template={template}
              subject={subject} setSubject={setSubject}
@@ -66,15 +63,15 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
            />
         </div>
 
-        {/* Variable Panel (Desktop) */}
+        {/* Variable Panel (Desktop Side-by-Side) */}
         {hasVariables && !isMobile && (
            <motion.div 
              initial={false}
-             animate={{ width: showVariables ? 300 : 0, opacity: showVariables ? 1 : 0 }}
-             transition={{ duration: 0.2, ease: "easeInOut" }}
-             className="hidden lg:block h-full border-l border-gray-200 bg-white relative overflow-hidden"
+             animate={{ width: showVariables ? 380 : 0, opacity: showVariables ? 1 : 0 }}
+             transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+             className="hidden lg:block h-full border-l border-[#e6e4e1] relative overflow-hidden"
            >
-             <div className="absolute inset-0 w-[300px]">
+             <div className="absolute inset-0 w-[380px]">
                 <VariablePanel 
                   placeholders={placeholders} 
                   variableValues={variableValues} 
@@ -85,7 +82,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
            </motion.div>
         )}
 
-        {/* Mobile Variables Modal */}
+        {/* Mobile Variables Modal (Bottom Sheet) */}
         <AnimatePresence>
           {isMobile && hasVariables && showVariables && (
             <>
@@ -103,12 +100,12 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                 animate={{ y: 0 }}
                 exit={{ y: "100%" }}
                 transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-xl shadow-2xl h-[70vh] flex flex-col overflow-hidden lg:hidden"
+                className="fixed inset-x-0 bottom-0 z-50 bg-[#fdfcfb] rounded-t-[24px] shadow-2xl h-[75vh] flex flex-col overflow-hidden lg:hidden"
               >
-                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-white shrink-0">
-                  <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Preenchimento</h3>
-                  <button onClick={() => setShowVariables(false)} className="p-1.5 bg-gray-100 rounded-full hover:bg-gray-200 text-gray-600">
-                    <X size={16} />
+                <div className="flex items-center justify-between px-6 py-5 border-b border-[#e6e4e1] shrink-0">
+                  <h3 className="text-sm font-bold text-[#1a1918] uppercase tracking-wider">Personalização</h3>
+                  <button onClick={() => setShowVariables(false)} className="p-2 bg-[#f2f0ed] rounded-full hover:bg-[#e6e4e1] text-[#1a1918] transition-colors">
+                    <X size={18} />
                   </button>
                 </div>
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -117,7 +114,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                       variableValues={variableValues} 
                       onVariableChange={handleVariableChange} 
                       isVisible={true}
-                      className="p-5 pb-24"
+                      className="p-6 pb-24"
                    />
                 </div>
               </motion.div>
@@ -125,20 +122,20 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
           )}
         </AnimatePresence>
 
-        {/* FABs */}
+        {/* FABs (Floating Action Buttons) - High Contrast Editorial Style */}
         {!isScenarioMode && (
-          <div className="absolute bottom-6 right-6 z-30 flex flex-col items-end gap-3 pointer-events-none">
+          <div className="absolute bottom-8 right-8 z-30 flex flex-col items-end gap-4 pointer-events-none">
             {secondaryContent && (
               <button 
                 onClick={() => copyToClipboard(secondaryContent, 'sec-float')} 
                 className={`
-                  pointer-events-auto flex items-center gap-2 px-4 py-2 rounded-full shadow-md border transition-transform active:scale-95
+                  pointer-events-auto flex items-center gap-3 px-5 py-3 rounded-full shadow-lg border backdrop-blur-sm transition-all duration-300 hover:scale-105
                   ${isCopied('sec-float') 
                     ? 'bg-emerald-600 text-white border-emerald-600' 
-                    : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'}
+                    : 'bg-white/90 text-[#1a1918] border-[#e6e4e1] hover:border-[#1a1918]'}
                 `}
               >
-                {isCopied('sec-float') ? <Check size={16} /> : <Layers size={16} />}
+                {isCopied('sec-float') ? <Check size={18} /> : <Layers size={18} />}
                 <span className="text-xs font-bold uppercase tracking-wider">
                   {isCopied('sec-float') ? 'Copiado' : (template.secondaryLabel || 'Protocolo')}
                 </span>
@@ -148,14 +145,14 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
             <button 
               onClick={() => copyToClipboard(content, 'main-float')} 
               className={`
-                pointer-events-auto flex items-center gap-2 px-5 py-3 rounded-full shadow-lg border transition-transform active:scale-95
+                pointer-events-auto flex items-center gap-3 px-8 py-4 rounded-full shadow-2xl border transition-all duration-300 hover:scale-105 active:scale-95
                 ${isCopied('main-float') 
                   ? 'bg-emerald-600 text-white border-emerald-600' 
-                  : 'bg-black text-white border-transparent hover:bg-gray-900'}
+                  : 'bg-[#1a1918] text-white border-[#1a1918] hover:bg-black'}
               `}
             >
-              {isCopied('main-float') ? <Check size={18} /> : <Copy size={18} />}
-              <span className="text-sm font-bold uppercase tracking-wider">
+              {isCopied('main-float') ? <Check size={20} /> : <Copy size={20} />}
+              <span className="text-sm font-bold uppercase tracking-widest">
                 {isCopied('main-float') ? 'Copiado' : 'Copiar Texto'}
               </span>
             </button>

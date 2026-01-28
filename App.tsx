@@ -2,11 +2,13 @@ import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Editor } from './components/Editor';
 import { INITIAL_TEMPLATES, CATEGORIES } from './constants';
-import { Search, X, ChevronRight, Menu } from 'lucide-react';
-import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import { Search, X, Menu, ArrowRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useDebounce } from './hooks/useDebounce';
 import { getAccentInsensitiveRegex } from './utils/textUtils';
 import { useAppContext } from './contexts/AppContext';
+
+// --- COMPONENTS ---
 
 const HighlightedText = React.memo(({ text, highlight, className }: { text: string, highlight: string, className?: string }) => {
   if (!highlight.trim()) return <span className={className}>{text}</span>;
@@ -16,7 +18,7 @@ const HighlightedText = React.memo(({ text, highlight, className }: { text: stri
     <span className={className}>
       {parts.map((part, i) => 
         regex.test(part) ? (
-          <span key={i} className="bg-yellow-100 text-black font-medium px-0.5 rounded-[1px]">
+          <span key={i} className="bg-[#e6e4e1] text-black font-medium px-0.5 rounded-[2px]">
             {part}
           </span>
         ) : part
@@ -29,31 +31,42 @@ interface TemplateCardProps {
   template: any;
   searchQuery: string;
   onClick: () => void;
+  index: number;
 }
 
-const TemplateCard: React.FC<TemplateCardProps> = ({ template, searchQuery, onClick }) => (
-  <div
+const TemplateCard: React.FC<TemplateCardProps> = ({ template, searchQuery, onClick, index }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay: index * 0.05, duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
     onClick={onClick}
-    className="group flex flex-col items-start text-left w-full h-full p-5 rounded-lg bg-white border border-gray-200 hover:border-gray-300 transition-all duration-200 hover:shadow-md cursor-pointer"
+    className="group relative flex flex-col p-6 h-full bg-white rounded-[20px] border border-transparent hover:border-[#e6e4e1] transition-all duration-300 hover:shadow-xl hover:shadow-black/5 cursor-pointer overflow-hidden"
   >
-    <div className="flex w-full justify-between items-start mb-3">
-        <span className={`text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-md border ${
-          template.channel === 'EMAIL' ? 'bg-blue-50 text-blue-700 border-blue-100' : 
-          (template.channel === 'PROMPT' ? 'bg-purple-50 text-purple-700 border-purple-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100')
-        }`}>
-          {template.channel === 'EMAIL' ? 'Email' : (template.channel === 'PROMPT' ? 'Prompt' : 'Chat')}
-        </span>
+    <div className="flex justify-between items-start mb-4">
+      <span className={`
+        text-[10px] font-bold tracking-widest uppercase px-2 py-1 rounded-full border
+        ${template.channel === 'EMAIL' ? 'bg-blue-50/50 text-blue-600 border-blue-100' : 
+         (template.channel === 'PROMPT' ? 'bg-purple-50/50 text-purple-600 border-purple-100' : 
+         'bg-emerald-50/50 text-emerald-600 border-emerald-100')}
+      `}>
+        {template.channel === 'EMAIL' ? 'Email' : (template.channel === 'PROMPT' ? 'Prompt' : 'Chat')}
+      </span>
+      <div className="w-8 h-8 rounded-full border border-[#e6e4e1] flex items-center justify-center text-[#d1cdc7] group-hover:bg-black group-hover:border-black group-hover:text-white transition-all duration-300">
+         <ArrowRight size={14} />
+      </div>
     </div>
-    
-    <h3 className="text-lg font-semibold text-gray-900 mb-2 leading-tight group-hover:text-black">
+
+    <h3 className="text-xl font-serif italic-editorial text-[#1a1918] mb-3 leading-tight group-hover:underline decoration-1 underline-offset-4 decoration-gray-300">
         <HighlightedText text={template.title} highlight={searchQuery} />
     </h3>
     
-    <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed mt-auto">
+    <p className="text-sm text-[#6e6b66] line-clamp-3 leading-relaxed mt-auto font-sans">
         <HighlightedText text={template.description || ''} highlight={searchQuery} />
     </p>
-  </div>
+  </motion.div>
 );
+
+// --- MAIN APP ---
 
 const App: React.FC = () => {
   const {
@@ -61,7 +74,6 @@ const App: React.FC = () => {
     selectedTemplate, setSelectedTemplate,
     searchQuery, setSearchQuery,
     isSidebarOpen, setIsSidebarOpen,
-    isSidebarPinned, setIsSidebarPinned
   } = useAppContext();
 
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -77,10 +89,6 @@ const App: React.FC = () => {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, [setIsSidebarOpen]);
-
-  useEffect(() => {
-    if (!isMobile) setIsSidebarPinned(true);
-  }, [isMobile, setIsSidebarPinned]);
 
   const normalizeText = (str: string) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "";
 
@@ -98,157 +106,137 @@ const App: React.FC = () => {
     return filtered;
   }, [selectedCategory, debouncedSearchQuery]);
 
-  const currentCategoryName = debouncedSearchQuery 
-    ? `Resultados`
-    : (selectedCategory === 'all' ? 'Visão Geral' : CATEGORIES.find(c => c.id === selectedCategory)?.name || 'Módulo');
+  const categoryInfo = useMemo(() => {
+    if (debouncedSearchQuery) return { title: 'Busca', subtitle: `${filteredTemplates.length} resultados encontrados` };
+    if (selectedCategory === 'all') return { title: 'Visão Geral', subtitle: 'Todos os seus modelos disponíveis' };
+    const cat = CATEGORIES.find(c => c.id === selectedCategory);
+    return { title: cat?.name || 'Módulo', subtitle: 'Modelos selecionados' };
+  }, [selectedCategory, debouncedSearchQuery, filteredTemplates.length]);
 
   return (
-    <LayoutGroup>
-      <div className="flex h-[100dvh] w-full overflow-hidden text-gray-900 font-sans bg-gray-50 relative">
-        
-        <Sidebar 
-          selectedCategory={debouncedSearchQuery ? 'all' : selectedCategory} 
-          onSelectCategory={(id) => { setSelectedCategory(id); setSearchQuery(''); setSelectedTemplate(null); }}
-          isOpen={isSidebarOpen}
-          onCloseMobile={() => setIsSidebarOpen(false)}
-          isMobile={isMobile}
-          isPinned={isSidebarPinned}
-          onTogglePin={() => setIsSidebarPinned(!isSidebarPinned)}
-        />
+    <div className="flex h-[100dvh] w-full overflow-hidden relative">
+      
+      {/* Sidebar / Dock */}
+      <Sidebar 
+        selectedCategory={debouncedSearchQuery ? 'all' : selectedCategory} 
+        onSelectCategory={(id) => { setSelectedCategory(id); setSearchQuery(''); setSelectedTemplate(null); }}
+        isOpen={isSidebarOpen}
+        onCloseMobile={() => setIsSidebarOpen(false)}
+        isMobile={isMobile}
+      />
 
-        <main className="flex-1 flex flex-col h-full overflow-hidden relative z-10">
-          {/* Mobile Header */}
-          <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 sticky top-0 z-30 shrink-0">
-             <button 
-              onClick={() => setIsSidebarOpen(true)}
-              className="p-2 -ml-2 text-gray-600 active:bg-gray-100 rounded-md"
-             >
-               <Menu size={20} />
-             </button>
-            <span className="font-semibold text-gray-900">QuickComms</span>
-            <div className="w-8"></div>
-          </header>
+      {/* Main "Window" Container */}
+      <main 
+        className={`
+          flex-1 flex flex-col h-full overflow-hidden relative transition-all duration-500 ease-[0.23,1,0.32,1]
+          ${isMobile ? 'bg-[#f2f0ed]' : 'my-4 mr-4 ml-24 rounded-[24px] border border-white/50 bg-[#fdfcfb] shadow-2xl shadow-[#1a1918]/5'}
+        `}
+      >
+        {/* Mobile Header */}
+        <header className="lg:hidden flex items-center justify-between px-6 py-5 sticky top-0 z-30 shrink-0 bg-[#f2f0ed]/80 backdrop-blur-md">
+           <button 
+            onClick={() => setIsSidebarOpen(true)}
+            className="p-2 -ml-2 text-[#1a1918]"
+           >
+             <Menu size={24} strokeWidth={1.5} />
+           </button>
+          <span className="font-serif italic text-xl text-[#1a1918]">QuickComms</span>
+          <div className="w-8"></div>
+        </header>
 
-          <div className="flex-1 flex overflow-hidden w-full relative">
-            <AnimatePresence mode="wait" initial={false}>
-              {/* LIST VIEW */}
-              {!selectedTemplate ? (
-                <motion.div 
-                  key="list-view"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="flex flex-col w-full h-full bg-gray-50/50"
-                >
-                  <div className="flex-1 overflow-y-auto custom-scrollbar">
-                    <div className="max-w-6xl mx-auto w-full px-6 py-8 md:px-10">
-                      
-                      {/* Header Section */}
-                      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
-                        <div>
-                          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1 block">
-                            {debouncedSearchQuery ? 'Pesquisa' : 'Módulo'}
-                          </span>
-                          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 tracking-tight">
-                            {currentCategoryName}
-                          </h2>
-                        </div>
-
-                        {/* Fast Search Bar */}
-                        <div className="relative w-full md:w-80 lg:w-96">
-                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                            <Search size={16} />
-                          </div>
-                          <input 
-                            ref={searchInputRef}
-                            type="text"
-                            placeholder="Buscar..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-9 pr-8 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-gray-400 transition-shadow shadow-sm"
-                          />
-                          {searchQuery && (
-                            <button 
-                              onClick={() => { setSearchQuery(''); searchInputRef.current?.focus(); }} 
-                              className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                            >
-                              <X size={14} />
-                            </button>
-                          )}
-                        </div>
+        {/* Content Viewport */}
+        <div className="flex-1 flex overflow-hidden w-full relative">
+          <AnimatePresence mode="wait" initial={false}>
+            
+            {/* --- LIST VIEW --- */}
+            {!selectedTemplate ? (
+              <motion.div 
+                key="list-view"
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98, filter: "blur(10px)" }}
+                transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+                className="flex flex-col w-full h-full"
+              >
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                  <div className="max-w-[1400px] mx-auto w-full px-6 py-8 md:px-12 md:py-12">
+                    
+                    {/* Editorial Hero Section */}
+                    <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-8 mb-16 border-b border-[#e6e4e1] pb-8">
+                      <div className="max-w-2xl">
+                        <span className="text-xs font-sans font-bold text-[#a8a49e] uppercase tracking-[0.2em] mb-3 block">
+                          {categoryInfo.subtitle}
+                        </span>
+                        <h2 className="text-5xl md:text-7xl font-serif italic-editorial text-[#1a1918] leading-[0.9] tracking-tight">
+                          {categoryInfo.title}
+                        </h2>
                       </div>
 
-                      {/* Content Area */}
-                      <div>
-                        {filteredTemplates.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-20 text-center rounded-xl bg-white border border-gray-200 border-dashed">
-                              <p className="font-medium text-gray-900 mb-1">Sem resultados</p>
-                              <p className="text-sm text-gray-500">Tente buscar por outro termo.</p>
-                            </div>
-                        ) : (
-                            // Simplified Grid Layout
-                            <div className="space-y-12">
-                                {(selectedCategory === 'all' && !debouncedSearchQuery) ? (
-                                   CATEGORIES.map(category => {
-                                      const categoryTemplates = filteredTemplates.filter(t => t.category === category.id);
-                                      if (categoryTemplates.length === 0) return null;
-                                      
-                                      return (
-                                        <div key={category.id}>
-                                            <div className="flex items-center gap-3 mb-4">
-                                              <h3 className="text-lg font-bold text-gray-900">{category.name}</h3>
-                                              <div className="h-px bg-gray-200 flex-1"></div>
-                                            </div>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                              {categoryTemplates.map(template => (
-                                                  <TemplateCard 
-                                                    key={template.id} 
-                                                    template={template} 
-                                                    searchQuery={debouncedSearchQuery}
-                                                    onClick={() => setSelectedTemplate(template)}
-                                                  />
-                                              ))}
-                                            </div>
-                                        </div>
-                                      )
-                                   })
-                                ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                      {filteredTemplates.map((template) => (
-                                          <TemplateCard 
-                                            key={template.id} 
-                                            template={template} 
-                                            searchQuery={debouncedSearchQuery}
-                                            onClick={() => setSelectedTemplate(template)}
-                                          />
-                                      ))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                      {/* Search Input - Minimalist */}
+                      <div className="relative w-full xl:w-96 group">
+                         <div className={`absolute inset-y-0 left-0 pl-0 flex items-center pointer-events-none transition-colors duration-300 ${searchQuery ? 'text-black' : 'text-[#a8a49e]'}`}>
+                            <Search size={20} strokeWidth={1.5} />
+                         </div>
+                         <input 
+                           ref={searchInputRef}
+                           type="text"
+                           placeholder="Buscar por termo, título ou conteúdo..."
+                           value={searchQuery}
+                           onChange={(e) => setSearchQuery(e.target.value)}
+                           className="w-full pl-8 pr-8 py-3 bg-transparent border-b border-[#e6e4e1] text-lg font-serif italic text-[#1a1918] focus:outline-none focus:border-black transition-colors placeholder:font-sans placeholder:not-italic"
+                         />
+                         {searchQuery && (
+                           <button 
+                             onClick={() => { setSearchQuery(''); searchInputRef.current?.focus(); }} 
+                             className="absolute inset-y-0 right-0 pr-0 flex items-center text-[#1a1918] hover:opacity-50"
+                           >
+                             <X size={16} />
+                           </button>
+                         )}
                       </div>
                     </div>
+
+                    {/* Grid Layout - Bento/Magazine Style */}
+                    <div className="min-h-[50vh]">
+                      {filteredTemplates.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center py-32 text-center opacity-50">
+                            <p className="font-serif italic text-2xl text-[#1a1918] mb-2">Nada encontrado</p>
+                            <p className="text-sm font-sans text-[#6e6b66]">Tente refinar sua busca.</p>
+                          </div>
+                      ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                             {filteredTemplates.map((template, idx) => (
+                                <TemplateCard 
+                                  key={template.id} 
+                                  template={template} 
+                                  searchQuery={debouncedSearchQuery}
+                                  onClick={() => setSelectedTemplate(template)}
+                                  index={idx}
+                                />
+                             ))}
+                          </div>
+                      )}
+                    </div>
                   </div>
-                </motion.div>
-              ) : (
-                /* EDITOR VIEW */
-                <motion.div
-                  key="editor-view"
-                  className="flex-1 h-full w-full bg-white relative"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ duration: 0.25, ease: "easeOut" }}
-                >
-                   <Editor template={selectedTemplate} onClose={() => setSelectedTemplate(null)} />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </main>
-      </div>
-    </LayoutGroup>
+                </div>
+              </motion.div>
+            ) : (
+              /* --- EDITOR VIEW --- */
+              <motion.div
+                key="editor-view"
+                className="absolute inset-0 z-20 bg-[#fdfcfb] flex flex-col"
+                initial={{ opacity: 0, y: "100%" }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: "100%" }}
+                transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              >
+                 <Editor template={selectedTemplate} onClose={() => setSelectedTemplate(null)} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </main>
+    </div>
   );
 };
 
