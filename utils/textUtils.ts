@@ -51,9 +51,9 @@ export const formatValueForText = (value: string, type: string): string => {
  */
 export const getGreeting = (): string => {
   const hour = new Date().getHours();
-  if (hour >= 6 && hour < 12) return 'bom dia';
-  if (hour >= 12 && hour < 18) return 'boa tarde';
-  return 'boa noite';
+  if (hour >= 6 && hour < 12) return 'Bom Dia';
+  if (hour >= 12 && hour < 18) return 'Boa Tarde';
+  return 'Boa Noite';
 };
 
 /**
