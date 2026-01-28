@@ -19,15 +19,13 @@ import { motion, AnimatePresence, LayoutGroup, Variants } from 'framer-motion';
 interface SidebarProps {
   selectedCategory: string;
   onSelectCategory: (id: string) => void;
-  isOpen: boolean; // Mobile open state
+  isOpen: boolean; 
   onCloseMobile: () => void;
-  isMobile: boolean; // Screen context
-  // New props for controlled state
+  isMobile: boolean; 
   isPinned: boolean;
   onTogglePin: () => void;
 }
 
-// Icon Mapping with refined choices if needed
 const IconMap: Record<string, React.FC<any>> = {
   Layers, 
   Clock: Calendar, 
@@ -36,37 +34,13 @@ const IconMap: Record<string, React.FC<any>> = {
   Sparkles: Sparkles
 };
 
-// --- ANIMAÇÕES DE ENTRADA (POP-IN) ---
-const navVariants: Variants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.05,
-      delayChildren: 0.1
-    }
-  }
-};
-
+// Faster, crisper animations
 const itemVariants: Variants = {
-  hidden: { 
-    opacity: 0, 
-    y: 12, 
-    scaleY: 0.9, 
-    filter: 'blur(4px)' 
-  },
+  hidden: { opacity: 0, x: -10 },
   visible: { 
     opacity: 1, 
-    y: 0, 
-    scaleY: 1, 
-    filter: 'blur(0px)',
-    transition: {
-      type: "spring",
-      stiffness: 350,
-      damping: 25,
-      mass: 0.8,
-      filter: { type: "tween", ease: "easeOut", duration: 0.3 }
-    }
+    x: 0, 
+    transition: { duration: 0.2, ease: "easeOut" }
   }
 };
 
@@ -82,7 +56,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
-  // Logic to determine if sidebar is visually expanded
   const isExpanded = isMobile ? true : (isPinned || isHovered);
 
   useEffect(() => {
@@ -103,35 +76,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  const transition = { type: "spring" as const, stiffness: 300, damping: 30, mass: 1 };
-
   const sidebarVariants = {
-    mobileClosed: { 
-      x: "-100%", 
-      width: "18rem", 
-      transition: { ...transition, damping: 25 }
-    },
-    mobileOpen: { 
-      x: "0%", 
-      width: "18rem",
-      transition: { ...transition, damping: 25 }
-    },
-    desktopCollapsed: { 
-      x: "0%", 
-      width: "5rem", 
-      transition 
-    },
-    desktopExpanded: { 
-      x: "0%", 
-      width: "18rem",
-      transition 
-    }
+    mobileClosed: { x: "-100%", width: "16rem", transition: { duration: 0.2 } },
+    mobileOpen: { x: "0%", width: "16rem", transition: { type: "spring", stiffness: 300, damping: 30 } },
+    desktopCollapsed: { width: "4.5rem", transition: { duration: 0.2, ease: "easeInOut" } },
+    desktopExpanded: { width: "16rem", transition: { duration: 0.2, ease: "easeInOut" } }
   };
 
   const getCurrentVariant = () => {
-    if (isMobile) {
-      return isOpen ? "mobileOpen" : "mobileClosed";
-    }
+    if (isMobile) return isOpen ? "mobileOpen" : "mobileClosed";
     return isExpanded ? "desktopExpanded" : "desktopCollapsed";
   };
 
@@ -143,8 +96,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[60]"
+            className="fixed inset-0 bg-black/10 z-[60]"
             onClick={onCloseMobile}
           />
         )}
@@ -157,93 +109,67 @@ export const Sidebar: React.FC<SidebarProps> = ({
         className={`
           fixed inset-y-0 left-0 z-[70]
           flex flex-col h-full 
-          overflow-hidden
-          bg-white/90
-          ${isMobile ? 'backdrop-blur-xl max-w-[85vw]' : 'backdrop-blur-3xl'}
-          border-r border-black/5
-          shadow-2xl lg:shadow-none
+          bg-white border-r border-gray-200
+          shadow-sm
         `}
         onMouseEnter={() => !isMobile && setIsHovered(true)}
         onMouseLeave={() => !isMobile && setIsHovered(false)}
       >
         {!isMobile && (
-          <div className="absolute -right-3 top-9 z-50">
+          <div className="absolute -right-3 top-6 z-50">
             <AnimatePresence>
               {isExpanded && (
                 <motion.button 
-                  initial={{ opacity: 0, scale: 0.5, x: -10 }}
-                  animate={{ opacity: 1, scale: 1, x: 0 }}
-                  exit={{ opacity: 0, scale: 0.5, x: -10 }}
-                  transition={{ duration: 0.2 }}
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
                   onClick={onTogglePin}
-                  className="w-5 h-5 flex items-center justify-center bg-white border border-gray-100 shadow-sm rounded-full text-gray-400 hover:text-black cursor-pointer transition-colors"
-                  title={isPinned ? "Desafixar Sidebar" : "Fixar Sidebar"}
+                  className="w-6 h-6 flex items-center justify-center bg-white border border-gray-200 shadow-sm rounded-full text-gray-400 hover:text-black hover:border-gray-300 transition-all"
                 >
-                  {isPinned ? <Pin size={8} strokeWidth={1} /> : <PinOff size={8} strokeWidth={1} />}
+                  {isPinned ? <Pin size={10} strokeWidth={2} /> : <PinOff size={10} strokeWidth={2} />}
                 </motion.button>
               )}
             </AnimatePresence>
           </div>
         )}
 
-        {/* Brand - Clickable to Reset/Home */}
-        <button 
-          onClick={() => {
-            onSelectCategory('all');
-            if (isMobile) onCloseMobile();
-          }}
-          className="relative px-6 py-10 flex items-center shrink-0 z-10 min-h-[5rem] w-full text-left outline-none group focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black/10"
-          title="Voltar ao início"
-        >
-           <div className="shrink-0 flex items-center justify-center z-20 w-8 h-8 rounded-lg bg-black text-white group-hover:scale-105 group-active:scale-95 transition-transform duration-200">
-              <Command size={14} strokeWidth={1.5} />
+        {/* Brand */}
+        <div className="h-16 flex items-center px-4 shrink-0 border-b border-transparent">
+           <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-black text-white shrink-0">
+              <Command size={18} />
            </div>
           
           <AnimatePresence>
             {isExpanded && (
               <motion.div
-                initial={{ opacity: 0, x: -10, filter: 'blur(4px)' }}
-                animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
-                exit={{ opacity: 0, x: -10, filter: 'blur(4px)' }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-                className="ml-4 flex flex-col justify-center whitespace-nowrap overflow-hidden"
+                initial={{ opacity: 0, x: -5 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="ml-3 overflow-hidden whitespace-nowrap"
               >
-                <h1 className="text-lg font-serif italic tracking-wide text-black leading-none group-hover:text-gray-600 transition-colors">
-                  QuickComms
-                </h1>
+                <h1 className="font-semibold text-gray-900 tracking-tight">QuickComms</h1>
               </motion.div>
             )}
           </AnimatePresence>
-        </button>
+        </div>
 
         {/* Nav */}
         <LayoutGroup id="sidebar-nav">
-          <motion.nav 
-            className="flex-1 overflow-y-auto px-4 py-2 custom-scrollbar overflow-x-hidden z-10 flex flex-col gap-1"
-            variants={navVariants}
-            initial="hidden"
-            animate="visible"
-          >
+          <nav className="flex-1 overflow-y-auto px-3 py-4 custom-scrollbar flex flex-col gap-0.5">
               <SidebarItem 
                 id="all"
                 label="Visão Geral"
                 icon={LayoutTemplate}
                 isSelected={selectedCategory === 'all'}
                 isExpanded={isExpanded}
-                isMobile={isMobile}
-                variants={itemVariants}
                 onClick={() => {
                   onSelectCategory('all');
                   if (isMobile) onCloseMobile();
                 }}
               />
 
-              <motion.div 
-                className="my-3 mx-2 h-px bg-black/5" 
-                variants={itemVariants}
-              />
+              <div className="my-2 border-b border-gray-100 mx-2" />
 
               {CATEGORIES.map((cat: Category) => (
                 <SidebarItem 
@@ -253,46 +179,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   icon={IconMap[cat.icon] || GalleryVerticalEnd}
                   isSelected={selectedCategory === cat.id}
                   isExpanded={isExpanded}
-                  isMobile={isMobile}
-                  variants={itemVariants}
                   onClick={() => {
                     onSelectCategory(cat.id);
                     if (isMobile) onCloseMobile();
                   }}
                 />
               ))}
-          </motion.nav>
+          </nav>
         </LayoutGroup>
 
         {/* Footer */}
-        {deferredPrompt && (
-          <div className="p-4 mt-auto shrink-0 z-10">
-              <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+        {deferredPrompt && isExpanded && (
+          <div className="p-4 border-t border-gray-100 bg-gray-50/50">
+              <button
               onClick={handleInstallClick}
-              className={`
-                relative w-full flex items-center transition-all duration-300 group rounded-lg border border-black/5 bg-white
-                ${!isExpanded ? 'justify-center py-3' : 'px-4 py-3 space-x-3'}
-                text-gray-400 hover:text-black hover:border-black/20
-              `}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-sm"
             >
-              <span className="shrink-0 flex items-center justify-center">
-                <Download size={16} strokeWidth={0.75} />
-              </span>
-              <AnimatePresence>
-                {isExpanded && (
-                  <motion.span 
-                    initial={{ opacity: 0, width: 0 }}
-                    animate={{ opacity: 1, width: 'auto' }}
-                    exit={{ opacity: 0, width: 0 }}
-                    className="text-[9px] font-sans font-medium tracking-[0.1em] uppercase whitespace-nowrap overflow-hidden"
-                  >
-                    Instalar App
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </motion.button>
+              <Download size={14} />
+              <span>Instalar App</span>
+            </button>
           </div>
         )}
       </motion.aside>
@@ -301,8 +206,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <motion.div 
           className="shrink-0 hidden lg:block"
           initial={false}
-          animate={{ width: isExpanded ? "18rem" : "5rem" }}
-          transition={transition}
+          animate={{ width: isExpanded ? "16rem" : "4.5rem" }}
+          transition={{ duration: 0.2, ease: "easeInOut" }}
         />
       )}
     </>
@@ -315,70 +220,27 @@ const SidebarItem: React.FC<{
   icon: any;
   isSelected: boolean;
   isExpanded: boolean;
-  isMobile: boolean;
   onClick: () => void;
-  variants?: Variants; 
-}> = ({ label, icon: Icon, isSelected, isExpanded, isMobile, onClick, variants }) => {
-  const [isHovered, setIsHovered] = useState(false);
-
+}> = ({ label, icon: Icon, isSelected, isExpanded, onClick }) => {
   return (
-    <motion.button
-      layout="position" 
-      variants={variants}
-      onHoverStart={() => setIsHovered(true)}
-      onHoverEnd={() => setIsHovered(false)}
-      onTap={() => setIsHovered(false)}
+    <button
       onClick={onClick}
       className={`
-        relative w-full flex items-center rounded-lg z-10 group
-        ${!isExpanded ? 'justify-center py-3' : 'px-4 py-2.5 space-x-4'}
-        transition-colors duration-300
-        ${isSelected ? 'text-black' : 'text-gray-400 hover:text-black'}
+        relative w-full flex items-center rounded-md z-10 group
+        ${!isExpanded ? 'justify-center h-10' : 'px-3 h-10 gap-3'}
+        transition-colors duration-150
+        ${isSelected ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}
       `}
     >
-      {isSelected && (
-        <motion.div
-          layoutId="sidebar-active-bg"
-          className="absolute inset-0 bg-black/[0.03] rounded-lg z-0"
-          initial={false}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        />
-      )}
+      <span className="shrink-0 flex items-center justify-center">
+        <Icon size={18} strokeWidth={isSelected ? 2 : 1.5} className="transition-all" />
+      </span>
       
-      {!isSelected && isHovered && (
-        <motion.div
-          layoutId="sidebar-hover-bg"
-          className="absolute inset-0 bg-black/[0.015] rounded-lg z-0"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
-        />
+      {isExpanded && (
+        <span className={`text-sm whitespace-nowrap overflow-hidden ${isSelected ? 'font-medium' : 'font-normal'}`}>
+          {label}
+        </span>
       )}
-
-      <motion.span 
-        layout="position" 
-        className="shrink-0 flex items-center justify-center relative z-10"
-      >
-        <Icon size={20} strokeWidth={0.75} className={isSelected ? "text-black" : "text-gray-400 group-hover:text-black transition-colors"} />
-      </motion.span>
-      
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.span 
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -10 }}
-            transition={{ duration: 0.2 }}
-            className={`
-              text-[11px] font-sans tracking-wide whitespace-nowrap overflow-hidden relative z-10
-              ${isSelected ? 'font-medium' : 'font-normal'}
-            `}
-          >
-            {label}
-          </motion.span>
-        )}
-      </AnimatePresence>
-    </motion.button>
+    </button>
   );
 }

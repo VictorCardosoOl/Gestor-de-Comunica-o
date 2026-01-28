@@ -4,16 +4,14 @@
   --font-serif: 'Cormorant Garamond', serif;
   --font-sans: 'Inter', sans-serif;
 
-  /* Theme Colors - High Contrast Adjusted */
-  --color-bg-base: #f4f4f5; 
-  --color-text-primary: #111111; /* Darker black */
-  --color-text-secondary: #4b5563; /* Darker gray (Tailwind gray-600 equivalent) for WCAG */
+  /* Theme Colors - Clean & Minimal */
+  --color-bg-base: #ffffff; 
+  --color-bg-subtle: #f9fafb; /* Gray-50 */
+  --color-border: #e5e7eb;    /* Gray-200 */
   
-  /* Gradient Ambient - Reduced Opacity for Performance */
-  --grad-1: rgba(255, 255, 255, 0.9);
-  --grad-2: rgba(230, 232, 236, 0.8);
-  --grad-3: rgba(220, 222, 228, 0.7);
-  --grad-4: rgba(240, 242, 245, 0.8);
+  --color-text-primary: #111827; /* Gray-900 */
+  --color-text-secondary: #6b7280; /* Gray-500 */
+  --color-text-tertiary: #9ca3af; /* Gray-400 */
 }
 
 html, body {
@@ -25,17 +23,10 @@ html, body {
 
 body {
   font-family: var(--font-sans);
-  background-color: var(--color-bg-base);
+  background-color: var(--color-bg-subtle);
   color: var(--color-text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  
-  /* Simplified background for performance */
-  background-image: 
-    radial-gradient(at 0% 0%, var(--grad-1) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, var(--grad-4) 0px, transparent 50%);
-  background-attachment: fixed;
-  background-size: cover;
 }
 
 /* Accessibility: Focus Visible */
@@ -44,66 +35,47 @@ body {
   outline-offset: 2px;
 }
 
-/* Scrollbar Editorial - Minimalist */
+/* Scrollbar Minimalist */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(0,0,0,0.1) transparent;
+  scrollbar-color: #d1d5db transparent;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 4px; 
+  width: 5px; 
 }
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent; 
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(0,0,0,0.15); 
-  border-radius: 10px;
+  background: #d1d5db; 
+  border-radius: 4px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(0,0,0,0.3); 
+  background: #9ca3af; 
 }
 
 /* Typography Utilities */
 .font-serif { font-family: var(--font-serif); }
 .font-sans { font-family: var(--font-sans); }
 
-.text-editorial-title {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-weight: 400; /* Increased weight for readability */
-  letter-spacing: -0.02em; 
-  line-height: 1;
-  font-size: clamp(2.5rem, 5vw, 4.5rem); 
-}
-
 .text-editorial-label {
   font-family: var(--font-sans);
-  font-weight: 600; /* Increased weight */
-  letter-spacing: 0.1em; 
+  font-weight: 600; 
+  letter-spacing: 0.05em; 
   text-transform: uppercase;
-  font-size: 0.65rem; 
+  font-size: 0.7rem; 
   line-height: 1.4;
-  color: #6b7280; /* Accessible gray */
-}
-
-.text-editorial-body {
-  font-family: var(--font-sans);
-  font-weight: 400; /* Standard weight instead of light */
-  letter-spacing: 0.01em;
-  line-height: 1.6; 
-  font-size: clamp(0.95rem, 1vw, 1.05rem);
   color: var(--color-text-secondary);
 }
 
 ::selection {
-  background: rgba(0, 0, 0, 0.1);
-  color: #000;
+  background: #000;
+  color: #fff;
 }
 
 /* Input Resets */
 input::placeholder, textarea::placeholder {
-  color: #9ca3af !important; /* Tailwind gray-400 - darker than before */
-  font-style: italic;
+  color: var(--color-text-tertiary) !important;
   font-weight: 400;
 }

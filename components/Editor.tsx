@@ -1,9 +1,9 @@
 import React from 'react';
 import { Template } from '../types';
-import { motion, AnimatePresence, Variants } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useEditorLogic } from '../hooks/useEditorLogic';
 import { EditorHeader, VariablePanel, ContentArea } from './EditorComponents';
-import { Copy, Check, Layers } from 'lucide-react';
+import { Copy, Check, Layers, X } from 'lucide-react';
 import { useTemplateCopier } from '../hooks/useTemplateCopier';
 import { MagneticButton } from './MagneticButton';
 
@@ -11,53 +11,6 @@ interface EditorProps {
   template: Template;
   onClose: () => void;
 }
-
-// Sophisticated Editorial Entrance Animation
-const editorVariants: Variants = {
-  hidden: { 
-    opacity: 0,
-    scale: 0.98,
-    y: 10
-  },
-  visible: { 
-    opacity: 1, 
-    scale: 1,
-    y: 0,
-    transition: { 
-      duration: 0.5,
-      ease: [0.2, 0.65, 0.3, 0.9], // Editorial easing curve
-      when: "beforeChildren",
-      staggerChildren: 0.12
-    } 
-  },
-  exit: { 
-    opacity: 0,
-    scale: 0.98,
-    y: 10,
-    transition: { duration: 0.25, ease: "easeInOut" }
-  }
-};
-
-const contentItemVariants: Variants = {
-  hidden: { 
-    opacity: 0, 
-    y: 25, 
-    scaleY: 0.96, // Subtle vertical stretch effect
-    filter: "blur(4px)" // Cinematic blur reveal
-  },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
-    scaleY: 1,
-    filter: "blur(0px)",
-    transition: { 
-      type: "spring",
-      stiffness: 100,
-      damping: 20,
-      mass: 0.8
-    } 
-  }
-};
 
 export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
   const {
@@ -75,17 +28,19 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
 
   const { copyToClipboard, isCopied } = useTemplateCopier();
   const hasVariables = placeholders.length > 0;
+  
+  const [isMobile, setIsMobile] = React.useState(false);
+  React.useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   return (
-    <motion.div 
-      variants={editorVariants}
-      initial="hidden"
-      animate="visible"
-      exit="exit"
-      className="h-full flex flex-col bg-[#f8f9fa] relative lg:rounded-2xl overflow-hidden border border-white/50 shadow-2xl origin-center"
-    >
+    <div className="h-full flex flex-col bg-white relative overflow-hidden">
       {/* Header (Top) */}
-      <motion.div variants={contentItemVariants} className="z-20 relative">
+      <div className="z-20 relative border-b border-gray-200">
         <EditorHeader 
           template={template} 
           onClose={onClose} 
@@ -94,44 +49,32 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
           onReset={handleReset}
           hasVariables={hasVariables}
         />
-      </motion.div>
+      </div>
 
-      {/* Main Layout: Flex Row for Desktop (Content | Variables) */}
+      {/* Main Layout */}
       <div className="flex-1 flex overflow-hidden relative">
         
-        {/* Left/Center: Content Area (Scrollable) */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar relative bg-transparent pb-20"> 
-           {/* Mobile Variables */}
-           <div className="lg:hidden">
-              <VariablePanel 
-                  placeholders={placeholders} 
-                  variableValues={variableValues} 
-                  onVariableChange={handleVariableChange} 
-                  isVisible={showVariables} 
-               />
-           </div>
-
-           <motion.div variants={contentItemVariants}>
-             <ContentArea 
-               template={template}
-               subject={subject} setSubject={setSubject}
-               content={content} setContent={setContent}
-               secondaryContent={secondaryContent} setSecondaryContent={setSecondaryContent}
-               isScenarioMode={isScenarioMode}
-               scenarios={scenarios}
-             />
-           </motion.div>
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar relative bg-gray-50/30"> 
+           <ContentArea 
+             template={template}
+             subject={subject} setSubject={setSubject}
+             content={content} setContent={setContent}
+             secondaryContent={secondaryContent} setSecondaryContent={setSecondaryContent}
+             isScenarioMode={isScenarioMode}
+             scenarios={scenarios}
+           />
         </div>
 
-        {/* Right: Variable Panel (Desktop Sticky) */}
-        {hasVariables && (
+        {/* Variable Panel (Desktop) */}
+        {hasVariables && !isMobile && (
            <motion.div 
              initial={false}
-             animate={{ width: showVariables ? 320 : 0, opacity: showVariables ? 1 : 0 }}
-             transition={{ type: "spring", stiffness: 300, damping: 30 }}
+             animate={{ width: showVariables ? 300 : 0, opacity: showVariables ? 1 : 0 }}
+             transition={{ duration: 0.2, ease: "easeInOut" }}
              className="hidden lg:block h-full border-l border-gray-200 bg-white relative overflow-hidden"
            >
-             <div className="absolute inset-0 w-80">
+             <div className="absolute inset-0 w-[300px]">
                 <VariablePanel 
                   placeholders={placeholders} 
                   variableValues={variableValues} 
@@ -142,60 +85,83 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
            </motion.div>
         )}
 
-        {/* --- FLOATING ACTION BUTTONS (FAB) --- */}
-        {!isScenarioMode && (
-          <div className="absolute bottom-6 right-6 md:bottom-8 md:right-10 z-50 flex flex-col items-end gap-3 pointer-events-none">
-            <AnimatePresence>
-              {secondaryContent && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 20, scale: 0.8 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.8 }}
-                  transition={{ delay: 0.4 }} // Delay FAB appearance slightly
-                  className="pointer-events-auto"
-                >
-                  <MagneticButton 
-                    onClick={() => copyToClipboard(secondaryContent, 'sec-float')} 
-                    className={`
-                      group flex items-center gap-2 px-5 py-2.5 rounded-full shadow-lg border backdrop-blur-md transition-all duration-300
-                      ${isCopied('sec-float') 
-                        ? 'bg-green-500 text-white border-green-500' 
-                        : 'bg-white/90 text-gray-700 border-white/50 hover:bg-white hover:scale-105'}
-                    `}
-                  >
-                    {isCopied('sec-float') ? <Check size={16} /> : <Layers size={16} />}
-                    <span className="text-xs font-bold uppercase tracking-wider">
-                      {isCopied('sec-float') ? 'Copiado' : (template.secondaryLabel || 'Protocolo')}
-                    </span>
-                  </MagneticButton>
-                </motion.div>
-              )}
-            </AnimatePresence>
+        {/* Mobile Variables Modal */}
+        <AnimatePresence>
+          {isMobile && hasVariables && showVariables && (
+            <>
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden"
+                onClick={() => setShowVariables(false)}
+              />
+              
+              <motion.div 
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-xl shadow-2xl h-[70vh] flex flex-col overflow-hidden lg:hidden"
+              >
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-white shrink-0">
+                  <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Preenchimento</h3>
+                  <button onClick={() => setShowVariables(false)} className="p-1.5 bg-gray-100 rounded-full hover:bg-gray-200 text-gray-600">
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                   <VariablePanel 
+                      placeholders={placeholders} 
+                      variableValues={variableValues} 
+                      onVariableChange={handleVariableChange} 
+                      isVisible={true}
+                      className="p-5 pb-24"
+                   />
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
 
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }} // Stagger FABs
-              className="pointer-events-auto"
-            >
-              <MagneticButton 
-                onClick={() => copyToClipboard(content, 'main-float')} 
+        {/* FABs */}
+        {!isScenarioMode && (
+          <div className="absolute bottom-6 right-6 z-30 flex flex-col items-end gap-3 pointer-events-none">
+            {secondaryContent && (
+              <button 
+                onClick={() => copyToClipboard(secondaryContent, 'sec-float')} 
                 className={`
-                  group flex items-center gap-3 px-6 py-3.5 rounded-full shadow-xl border backdrop-blur-md transition-all duration-300
-                  ${isCopied('main-float') 
-                    ? 'bg-green-600 text-white border-green-600' 
-                    : 'bg-[#111] text-white border-black/10 hover:bg-black hover:scale-105 hover:shadow-2xl'}
+                  pointer-events-auto flex items-center gap-2 px-4 py-2 rounded-full shadow-md border transition-transform active:scale-95
+                  ${isCopied('sec-float') 
+                    ? 'bg-emerald-600 text-white border-emerald-600' 
+                    : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'}
                 `}
               >
-                {isCopied('main-float') ? <Check size={18} /> : <Copy size={18} />}
-                <span className="text-sm font-bold uppercase tracking-wider">
-                  {isCopied('main-float') ? 'Copiado!' : 'Copiar Texto'}
+                {isCopied('sec-float') ? <Check size={16} /> : <Layers size={16} />}
+                <span className="text-xs font-bold uppercase tracking-wider">
+                  {isCopied('sec-float') ? 'Copiado' : (template.secondaryLabel || 'Protocolo')}
                 </span>
-              </MagneticButton>
-            </motion.div>
+              </button>
+            )}
+
+            <button 
+              onClick={() => copyToClipboard(content, 'main-float')} 
+              className={`
+                pointer-events-auto flex items-center gap-2 px-5 py-3 rounded-full shadow-lg border transition-transform active:scale-95
+                ${isCopied('main-float') 
+                  ? 'bg-emerald-600 text-white border-emerald-600' 
+                  : 'bg-black text-white border-transparent hover:bg-gray-900'}
+              `}
+            >
+              {isCopied('main-float') ? <Check size={18} /> : <Copy size={18} />}
+              <span className="text-sm font-bold uppercase tracking-wider">
+                {isCopied('main-float') ? 'Copiado' : 'Copiar Texto'}
+              </span>
+            </button>
           </div>
         )}
       </div>
-    </motion.div>
+    </div>
   );
 };

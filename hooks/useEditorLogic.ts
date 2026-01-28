@@ -17,7 +17,14 @@ export const useEditorLogic = (template: Template) => {
   const [rawSecondaryContent, setRawSecondaryContent] = useState<string>('');
   
   const [variableValues, setVariableValues] = useState<Record<string, string>>({});
-  const [showVariables, setShowVariables] = useState(true);
+  
+  // Initialize showVariables based on screen width (Desktop: open, Mobile: closed)
+  const [showVariables, setShowVariables] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 1024;
+    }
+    return true;
+  });
 
   // Identify Scenario Mode
   const isScenarioMode = useMemo(() => template.content.includes('[CENÁRIO:'), [template.content]);
