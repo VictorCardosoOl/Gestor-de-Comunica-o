@@ -52,10 +52,10 @@ const App: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, [setIsSidebarOpen]);
 
+  // Handle Sidebar Pin logic based on screen size (simplified for new layout)
   useEffect(() => {
-    if (selectedTemplate && !isMobile) setIsSidebarPinned(false);
-    else if (!selectedTemplate && !isMobile) setIsSidebarPinned(true);
-  }, [selectedTemplate, isMobile, setIsSidebarPinned]);
+    if (!isMobile) setIsSidebarPinned(true);
+  }, [isMobile, setIsSidebarPinned]);
 
   const normalizeText = (str: string) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "";
 
@@ -130,111 +130,105 @@ const App: React.FC = () => {
             <div className="w-10"></div> {/* Spacer for center alignment */}
           </header>
 
-          <div className="flex-1 flex overflow-hidden w-full relative lg:p-4 lg:gap-4">
-            <motion.div 
-              layout 
-              className={`
-                flex flex-col shrink-0 relative z-20 w-full h-full
-                ${selectedTemplate ? 'lg:flex-[0_0_20rem] xl:flex-[0_0_24rem] lg:max-w-[25vw]' : 'lg:w-full'}
-                bg-white/60 backdrop-blur-xl lg:rounded-2xl overflow-hidden border border-white/40 shadow-sm
-              `}
-              transition={{ type: "spring", stiffness: 280, damping: 25 }}
-            >
-              <div className="px-6 pt-10 pb-4 shrink-0 z-10">
-                  <div className="flex flex-col gap-2">
-                    <span className="text-editorial-label text-gray-500 pl-0.5">{debouncedSearchQuery ? 'Pesquisa' : 'Categoria'}</span>
-                    <motion.h2 layout="position" className="text-editorial-title text-black tracking-tight truncate pr-2">{currentCategoryName}</motion.h2>
-                  </div>
-              </div>
-
-              {/* Search Bar */}
-              <div className="px-6 pb-6 shrink-0 z-30 relative">
-                <div className={`relative group flex items-center w-full rounded-xl transition-all duration-300 ease-out border bg-white ${isSearchFocused ? 'border-black/20 shadow-sm ring-2 ring-black/5' : 'border-black/5'}`}>
-                  <div className="pl-4 text-gray-400"><Search size={18} /></div>
-                  <input 
-                    ref={searchInputRef}
-                    type="text"
-                    placeholder="Buscar modelo..."
-                    value={searchQuery}
-                    onFocus={() => { setIsSearchFocused(true); setActiveSuggestionIndex(-1); }}
-                    onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-3 pr-12 py-3 bg-transparent border-none focus:ring-0 outline-none text-[#1a1a1a] text-sm font-sans"
-                  />
-                  <div className="absolute right-3">
-                     {searchQuery ? (
-                         <button onClick={() => { setSearchQuery(''); searchInputRef.current?.focus(); }} className="p-1 rounded-full bg-black/5 hover:bg-black hover:text-white text-gray-500 transition-colors"><X size={12} /></button>
-                       ) : (!isMobile && !isSearchFocused && (
-                           <div className="pointer-events-none flex items-center gap-0.5 px-2 py-1 rounded-md bg-gray-100 border border-black/5 text-[10px] font-sans font-medium text-gray-400"><Command size={9} /><span>K</span></div>
-                       ))}
-                  </div>
-                </div>
-                <AnimatePresence>
-                  {isSearchFocused && suggestions.length > 0 && (
-                    <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute left-6 right-6 top-[calc(100%+4px)] bg-white border border-gray-200 shadow-xl rounded-xl z-50 overflow-hidden">
-                        {suggestions.map((sug, idx) => (
-                          <button key={sug.id} onClick={() => handleSuggestionClick(sug)} className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center justify-between text-sm text-gray-700">
-                             <HighlightedText text={sug.title} highlight={searchQuery} />
-                          </button>
-                        ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Native Scroll List (Performance Optimized) */}
-              <div className="flex-1 overflow-y-auto custom-scrollbar relative z-10 px-4 pb-6">
-                 {filteredTemplates.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-20 text-center px-8">
-                       <p className="font-serif italic text-2xl text-black/40 mb-2">Sem resultados</p>
-                       <p className="text-xs text-gray-500">Tente buscar por outro termo.</p>
-                    </div>
-                 ) : (
-                    <div className="flex flex-col gap-2">
-                       {filteredTemplates.map((template, index) => (
-                          <motion.button
-                            key={template.id}
-                            layoutId={`card-${template.id}`}
-                            onClick={() => setSelectedTemplate(template)}
-                            className={`w-full text-left p-5 rounded-xl transition-all duration-200 border ${selectedTemplate?.id === template.id ? 'bg-white border-black/10 shadow-md ring-1 ring-black/5' : 'bg-transparent border-transparent hover:bg-white/50 hover:border-white'}`}
-                          >
-                             <div className="flex justify-between items-start mb-2">
-                                <span className={`text-[9px] font-bold tracking-wider uppercase px-2 py-0.5 rounded ${selectedTemplate?.id === template.id ? 'bg-black text-white' : 'bg-black/5 text-gray-500'}`}>
-                                   {template.channel === 'EMAIL' ? 'Email' : (template.channel === 'PROMPT' ? 'Prompt' : 'Chat')}
-                                </span>
-                             </div>
-                             <h3 className={`font-serif text-xl italic leading-tight mb-1.5 ${selectedTemplate?.id === template.id ? 'text-black' : 'text-gray-800'}`}>
-                                <HighlightedText text={template.title} highlight={debouncedSearchQuery} />
-                             </h3>
-                             <p className="text-[11px] text-gray-500 line-clamp-2 leading-relaxed">
-                                <HighlightedText text={template.description || ''} highlight={debouncedSearchQuery} />
-                             </p>
-                          </motion.button>
-                       ))}
-                    </div>
-                 )}
-              </div>
-            </motion.div>
-
+          <div className="flex-1 flex overflow-hidden w-full relative lg:p-4">
             <AnimatePresence mode="wait">
-              {selectedTemplate ? (
+              {/* LIST VIEW */}
+              {!selectedTemplate ? (
+                <motion.div 
+                  key="list-view"
+                  initial={{ opacity: 0, scale: 0.98, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.98, y: -10, filter: 'blur(4px)' }}
+                  transition={{ duration: 0.4, ease: [0.2, 0.65, 0.3, 0.9] }}
+                  className="flex flex-col w-full h-full max-w-5xl mx-auto bg-white/60 backdrop-blur-xl lg:rounded-2xl overflow-hidden border border-white/40 shadow-sm"
+                >
+                  <div className="px-6 pt-10 pb-4 shrink-0 z-10">
+                      <div className="flex flex-col gap-2">
+                        <span className="text-editorial-label text-gray-500 pl-0.5">{debouncedSearchQuery ? 'Pesquisa' : 'Categoria'}</span>
+                        <motion.h2 layout="position" className="text-editorial-title text-black tracking-tight truncate pr-2">{currentCategoryName}</motion.h2>
+                      </div>
+                  </div>
+
+                  {/* Search Bar */}
+                  <div className="px-6 pb-6 shrink-0 z-30 relative">
+                    <div className={`relative group flex items-center w-full max-w-2xl rounded-xl transition-all duration-300 ease-out border bg-white ${isSearchFocused ? 'border-black/20 shadow-sm ring-2 ring-black/5' : 'border-black/5'}`}>
+                      <div className="pl-4 text-gray-400"><Search size={18} /></div>
+                      <input 
+                        ref={searchInputRef}
+                        type="text"
+                        placeholder="Buscar modelo..."
+                        value={searchQuery}
+                        onFocus={() => { setIsSearchFocused(true); setActiveSuggestionIndex(-1); }}
+                        onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-3 pr-12 py-3 bg-transparent border-none focus:ring-0 outline-none text-[#1a1a1a] text-sm font-sans"
+                      />
+                      <div className="absolute right-3">
+                        {searchQuery ? (
+                            <button onClick={() => { setSearchQuery(''); searchInputRef.current?.focus(); }} className="p-1 rounded-full bg-black/5 hover:bg-black hover:text-white text-gray-500 transition-colors"><X size={12} /></button>
+                          ) : (!isMobile && !isSearchFocused && (
+                              <div className="pointer-events-none flex items-center gap-0.5 px-2 py-1 rounded-md bg-gray-100 border border-black/5 text-[10px] font-sans font-medium text-gray-400"><Command size={9} /><span>K</span></div>
+                          ))}
+                      </div>
+                    </div>
+                    <AnimatePresence>
+                      {isSearchFocused && suggestions.length > 0 && (
+                        <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute left-6 right-6 max-w-2xl top-[calc(100%+4px)] bg-white border border-gray-200 shadow-xl rounded-xl z-50 overflow-hidden">
+                            {suggestions.map((sug, idx) => (
+                              <button key={sug.id} onClick={() => handleSuggestionClick(sug)} className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center justify-between text-sm text-gray-700">
+                                <HighlightedText text={sug.title} highlight={searchQuery} />
+                              </button>
+                            ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* Native Scroll List (Performance Optimized) */}
+                  <div className="flex-1 overflow-y-auto custom-scrollbar relative z-10 px-4 pb-6">
+                    {filteredTemplates.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20 text-center px-8">
+                          <p className="font-serif italic text-2xl text-black/40 mb-2">Sem resultados</p>
+                          <p className="text-xs text-gray-500">Tente buscar por outro termo.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                          {filteredTemplates.map((template, index) => (
+                              <motion.button
+                                key={template.id}
+                                layoutId={`card-${template.id}`}
+                                onClick={() => setSelectedTemplate(template)}
+                                className="w-full h-full flex flex-col items-start text-left p-6 rounded-xl transition-all duration-300 border bg-transparent border-transparent hover:bg-white hover:shadow-md hover:border-black/5 group"
+                              >
+                                <div className="flex w-full justify-between items-start mb-3">
+                                    <span className={`text-[9px] font-bold tracking-wider uppercase px-2 py-0.5 rounded bg-black/5 text-gray-500 group-hover:bg-black group-hover:text-white transition-colors`}>
+                                      {template.channel === 'EMAIL' ? 'Email' : (template.channel === 'PROMPT' ? 'Prompt' : 'Chat')}
+                                    </span>
+                                </div>
+                                <h3 className="font-serif text-xl italic leading-tight mb-2 text-gray-800 group-hover:text-black">
+                                    <HighlightedText text={template.title} highlight={debouncedSearchQuery} />
+                                </h3>
+                                <p className="text-[11px] text-gray-500 line-clamp-3 leading-relaxed mt-auto">
+                                    <HighlightedText text={template.description || ''} highlight={debouncedSearchQuery} />
+                                </p>
+                              </motion.button>
+                          ))}
+                        </div>
+                    )}
+                  </div>
+                </motion.div>
+              ) : (
+                /* EDITOR VIEW */
                 <motion.div
-                  key={selectedTemplate.id}
-                  className="flex-1 h-full min-w-0 fixed inset-0 z-50 lg:static bg-[#f5f5f7] lg:bg-transparent"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  key="editor-view"
+                  className="flex-1 h-full min-w-0 w-full relative bg-transparent"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.4, ease: [0.2, 0.65, 0.3, 0.9] }}
                 >
                    <Editor template={selectedTemplate} onClose={() => setSelectedTemplate(null)} />
                 </motion.div>
-              ) : (
-                !isMobile && (
-                  <div className="hidden lg:flex flex-1 h-full flex-col items-center justify-center text-center opacity-30 select-none">
-                    <h3 className="text-8xl font-serif italic mb-4">Studio</h3>
-                    <p className="text-sm uppercase tracking-[0.3em]">Selecione um modelo</p>
-                  </div>
-                )
               )}
             </AnimatePresence>
           </div>

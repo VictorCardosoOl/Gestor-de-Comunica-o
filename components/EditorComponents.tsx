@@ -28,9 +28,15 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
   return (
     <div className="flex-none flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-black/5 relative z-20 bg-white/50 backdrop-blur-xl shrink-0 px-6 py-5 lg:rounded-t-2xl">
       <div className="flex items-start md:items-center space-x-4">
-        <button onClick={onClose} className="lg:hidden group flex items-center gap-2 text-black hover:opacity-50 transition-opacity mt-1 md:mt-0">
+        {/* Back Button - Visible on Mobile and Desktop now due to focus mode */}
+        <button 
+          onClick={onClose} 
+          className="group flex items-center gap-2 text-black hover:opacity-50 transition-opacity mt-1 md:mt-0 p-1.5 rounded-full hover:bg-black/5"
+          title="Voltar"
+        >
           <MoveLeft size={20} strokeWidth={0.75} />
         </button>
+        
         <div className="flex flex-col gap-1.5 min-w-0">
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 bg-black rounded-full shadow-sm"></span>
@@ -55,6 +61,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
         <MagneticButton onClick={onReset} className="text-gray-500 hover:text-black transition-colors p-2 hover:bg-black/5 rounded-full" title="Resetar">
           <RefreshCw size={16} strokeWidth={1} />
         </MagneticButton>
+        {/* 'X' Close button can be hidden or redundant since we have the back arrow, but kept for clarity */}
         <MagneticButton onClick={onClose} className="hidden lg:flex p-2 rounded-full text-gray-400 hover:text-black hover:bg-black/5 transition-colors" title="Fechar">
           <X size={18} strokeWidth={1} />
         </MagneticButton>
