@@ -1,6 +1,6 @@
 import React from 'react';
 import { Template } from '../types';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { useEditorLogic } from '../hooks/useEditorLogic';
 import { EditorHeader, VariablePanel, ContentArea } from './EditorComponents';
 import { Copy, Check, Layers } from 'lucide-react';
@@ -12,10 +12,51 @@ interface EditorProps {
   onClose: () => void;
 }
 
-const containerVariants = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1, transition: { duration: 0.3 } },
-  exit: { opacity: 0 }
+// Sophisticated Editorial Entrance Animation
+const editorVariants: Variants = {
+  hidden: { 
+    opacity: 0,
+    scale: 0.98,
+    y: 10
+  },
+  visible: { 
+    opacity: 1, 
+    scale: 1,
+    y: 0,
+    transition: { 
+      duration: 0.5,
+      ease: [0.2, 0.65, 0.3, 0.9], // Editorial easing curve
+      when: "beforeChildren",
+      staggerChildren: 0.12
+    } 
+  },
+  exit: { 
+    opacity: 0,
+    scale: 0.98,
+    y: 10,
+    transition: { duration: 0.25, ease: "easeInOut" }
+  }
+};
+
+const contentItemVariants: Variants = {
+  hidden: { 
+    opacity: 0, 
+    y: 25, 
+    scaleY: 0.96, // Subtle vertical stretch effect
+    filter: "blur(4px)" // Cinematic blur reveal
+  },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    scaleY: 1,
+    filter: "blur(0px)",
+    transition: { 
+      type: "spring",
+      stiffness: 100,
+      damping: 20,
+      mass: 0.8
+    } 
+  }
 };
 
 export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
@@ -37,24 +78,29 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
 
   return (
     <motion.div 
-      variants={containerVariants}
-      className="h-full flex flex-col bg-[#f8f9fa] relative lg:rounded-2xl overflow-hidden border border-white/50 shadow-2xl"
+      variants={editorVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      className="h-full flex flex-col bg-[#f8f9fa] relative lg:rounded-2xl overflow-hidden border border-white/50 shadow-2xl origin-center"
     >
       {/* Header (Top) */}
-      <EditorHeader 
-        template={template} 
-        onClose={onClose} 
-        showVariables={showVariables}
-        onToggleVariables={() => setShowVariables(!showVariables)}
-        onReset={handleReset}
-        hasVariables={hasVariables}
-      />
+      <motion.div variants={contentItemVariants} className="z-20 relative">
+        <EditorHeader 
+          template={template} 
+          onClose={onClose} 
+          showVariables={showVariables}
+          onToggleVariables={() => setShowVariables(!showVariables)}
+          onReset={handleReset}
+          hasVariables={hasVariables}
+        />
+      </motion.div>
 
       {/* Main Layout: Flex Row for Desktop (Content | Variables) */}
       <div className="flex-1 flex overflow-hidden relative">
         
         {/* Left/Center: Content Area (Scrollable) */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar relative bg-transparent pb-20"> {/* pb-20 ensures content isn't hidden behind FAB */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar relative bg-transparent pb-20"> 
            {/* Mobile Variables */}
            <div className="lg:hidden">
               <VariablePanel 
@@ -65,14 +111,16 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                />
            </div>
 
-           <ContentArea 
-             template={template}
-             subject={subject} setSubject={setSubject}
-             content={content} setContent={setContent}
-             secondaryContent={secondaryContent} setSecondaryContent={setSecondaryContent}
-             isScenarioMode={isScenarioMode}
-             scenarios={scenarios}
-           />
+           <motion.div variants={contentItemVariants}>
+             <ContentArea 
+               template={template}
+               subject={subject} setSubject={setSubject}
+               content={content} setContent={setContent}
+               secondaryContent={secondaryContent} setSecondaryContent={setSecondaryContent}
+               isScenarioMode={isScenarioMode}
+               scenarios={scenarios}
+             />
+           </motion.div>
         </div>
 
         {/* Right: Variable Panel (Desktop Sticky) */}
@@ -103,6 +151,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                   initial={{ opacity: 0, y: 20, scale: 0.8 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.8 }}
+                  transition={{ delay: 0.4 }} // Delay FAB appearance slightly
                   className="pointer-events-auto"
                 >
                   <MagneticButton 
@@ -126,6 +175,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }} // Stagger FABs
               className="pointer-events-auto"
             >
               <MagneticButton 
