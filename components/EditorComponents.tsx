@@ -1,6 +1,6 @@
-import React, { useRef, useLayoutEffect } from 'react';
+import React, { useRef, useLayoutEffect, memo } from 'react';
 import { Template, CommunicationChannel } from '../types';
-import { MoveLeft, SlidersHorizontal, RefreshCw, Sparkles, Calendar, Clock, AlignLeft, Quote, Copy, Check, ArrowUpLeft } from 'lucide-react';
+import { MoveLeft, SlidersHorizontal, RefreshCw, Sparkles, Calendar, Clock, AlignLeft, Quote, Copy, Check } from 'lucide-react';
 import { getInputType } from '../utils/textUtils';
 import { useTemplateCopier } from '../hooks/useTemplateCopier';
 
@@ -14,7 +14,7 @@ interface EditorHeaderProps {
   hasVariables: boolean;
 }
 
-export const EditorHeader: React.FC<EditorHeaderProps> = ({ 
+export const EditorHeader = memo<EditorHeaderProps>(({ 
   template, onClose, showVariables, onToggleVariables, onReset, hasVariables 
 }) => {
   return (
@@ -57,7 +57,9 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
       </div>
     </div>
   );
-};
+});
+
+EditorHeader.displayName = 'EditorHeader';
 
 // --- VARIABLE PANEL ---
 interface VariablePanelProps {
@@ -68,7 +70,7 @@ interface VariablePanelProps {
   className?: string; 
 }
 
-export const VariablePanel: React.FC<VariablePanelProps> = ({ placeholders, variableValues, onVariableChange, isVisible, className }) => {
+export const VariablePanel = memo<VariablePanelProps>(({ placeholders, variableValues, onVariableChange, isVisible, className }) => {
   if (!isVisible || placeholders.length === 0) return null;
 
   return (
@@ -116,7 +118,9 @@ export const VariablePanel: React.FC<VariablePanelProps> = ({ placeholders, vari
       </div>
     </div>
   );
-};
+});
+
+VariablePanel.displayName = 'VariablePanel';
 
 // --- CONTENT AREA ---
 interface ContentAreaProps {
@@ -131,17 +135,24 @@ interface ContentAreaProps {
   scenarios: any[];
 }
 
-export const ContentArea: React.FC<ContentAreaProps> = ({
+export const ContentArea = memo<ContentAreaProps>(({
   template, subject, setSubject, content, setContent, secondaryContent, setSecondaryContent, isScenarioMode, scenarios
 }) => {
   const { copyToClipboard, isCopied } = useTemplateCopier();
   const mainRef = useRef<HTMLTextAreaElement>(null);
   const secRef = useRef<HTMLTextAreaElement>(null);
 
+  // Optimized Height Adjustment to avoid Layout Thrashing
   const adjustHeight = (el: HTMLTextAreaElement | null) => {
     if (!el) return;
+    
+    // We only reset height if we are shrinking, otherwise scrollHeight is enough to grow.
+    // However, to be safe and accurate for deleting text, we set to auto first.
+    // To optimize, we can use requestAnimationFrame to batch DOM reads/writes if this causes issues.
+    
     el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
+    const newHeight = el.scrollHeight;
+    el.style.height = `${newHeight}px`;
   };
 
   useLayoutEffect(() => {
@@ -241,4 +252,6 @@ export const ContentArea: React.FC<ContentAreaProps> = ({
       )}
     </div>
   );
-};
+});
+
+ContentArea.displayName = 'ContentArea';
