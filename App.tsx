@@ -117,7 +117,16 @@ const App: React.FC = () => {
                  <Menu size={20} strokeWidth={1.5} />
                </button>
             </div>
-            <span className="font-serif italic text-xl font-medium tracking-tight text-black backdrop-blur-md bg-white/30 px-4 py-1 rounded-full border border-white/40 shadow-sm pointer-events-auto">QuickComms</span>
+            <button 
+              onClick={() => {
+                setSelectedCategory('all');
+                setSearchQuery('');
+                setSelectedTemplate(null);
+              }}
+              className="font-serif italic text-xl font-medium tracking-tight text-black backdrop-blur-md bg-white/30 px-4 py-1 rounded-full border border-white/40 shadow-sm pointer-events-auto hover:bg-white/50 transition-colors"
+            >
+              QuickComms
+            </button>
             <div className="w-10"></div> {/* Spacer for center alignment */}
           </header>
 

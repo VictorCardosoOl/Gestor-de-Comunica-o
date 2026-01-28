@@ -188,9 +188,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* Brand */}
-        <div className="relative px-6 py-10 flex items-center shrink-0 z-10 min-h-[5rem]">
-           <div className="shrink-0 flex items-center justify-center z-20 w-8 h-8 rounded-lg bg-black text-white">
+        {/* Brand - Clickable to Reset/Home */}
+        <button 
+          onClick={() => {
+            onSelectCategory('all');
+            if (isMobile) onCloseMobile();
+          }}
+          className="relative px-6 py-10 flex items-center shrink-0 z-10 min-h-[5rem] w-full text-left outline-none group focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black/10"
+          title="Voltar ao início"
+        >
+           <div className="shrink-0 flex items-center justify-center z-20 w-8 h-8 rounded-lg bg-black text-white group-hover:scale-105 group-active:scale-95 transition-transform duration-200">
               <Command size={14} strokeWidth={1.5} />
            </div>
           
@@ -203,13 +210,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 transition={{ duration: 0.3, ease: "easeOut" }}
                 className="ml-4 flex flex-col justify-center whitespace-nowrap overflow-hidden"
               >
-                <h1 className="text-lg font-serif italic tracking-wide text-black leading-none">
+                <h1 className="text-lg font-serif italic tracking-wide text-black leading-none group-hover:text-gray-600 transition-colors">
                   QuickComms
                 </h1>
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
+        </button>
 
         {/* Nav */}
         <LayoutGroup id="sidebar-nav">
