@@ -98,6 +98,19 @@ const App: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, [setIsSidebarOpen]);
 
+  // Keyboard Shortcut for Search (Cmd+K / Ctrl+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const normalizeText = (str: string) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "";
 
   const filteredTemplates = useMemo(() => {
@@ -203,6 +216,16 @@ const App: React.FC = () => {
                            onChange={(e) => setSearchQuery(e.target.value)}
                            className="w-full pl-8 pr-8 py-3 bg-transparent border-b border-[#e6e4e1] text-lg font-serif italic text-[#1a1918] focus:outline-none focus:border-black transition-colors placeholder:font-sans placeholder:not-italic"
                          />
+                         
+                         {/* Shortcut Badge (Shown when empty and not focused) */}
+                         {!searchQuery && (
+                            <div className="absolute inset-y-0 right-0 flex items-center pointer-events-none transition-opacity duration-300 opacity-100 group-focus-within:opacity-0">
+                               <span className="text-[10px] font-sans font-bold text-[#a8a49e] bg-[#f2f0ed] px-1.5 py-0.5 rounded-[4px] border border-[#d1cdc7]/50 tracking-wider">
+                                 ⌘K
+                               </span>
+                            </div>
+                         )}
+
                          {searchQuery && (
                            <button 
                              onClick={() => { setSearchQuery(''); searchInputRef.current?.focus(); }} 
