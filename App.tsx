@@ -25,6 +25,48 @@ const HighlightedText = React.memo(({ text, highlight, className }: { text: stri
   );
 });
 
+interface TemplateCardProps {
+  template: any;
+  searchQuery: string;
+  onClick: () => void;
+}
+
+// Helper Component for consistency in Grid and Grouped views
+const TemplateCard: React.FC<TemplateCardProps> = ({ template, searchQuery, onClick }) => (
+  <motion.button
+    layoutId={`card-${template.id}`}
+    onClick={onClick}
+    initial={{ opacity: 0, y: 10 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true, margin: "-50px" }}
+    className="group relative flex flex-col items-start text-left w-full h-full p-6 rounded-xl bg-white border border-gray-200/60 shadow-sm transition-all duration-300 hover:shadow-xl hover:shadow-black/5 hover:border-black/10 hover:-translate-y-1 overflow-hidden"
+  >
+    {/* Hover Arrow Action */}
+    <div className="absolute top-5 right-5 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
+       <div className="bg-black text-white rounded-full p-1.5 shadow-md">
+         <ChevronRight size={14} strokeWidth={2} />
+       </div>
+    </div>
+
+    <div className="flex w-full justify-between items-start mb-5">
+        <span className={`text-[10px] font-bold tracking-widest uppercase px-3 py-1 rounded-full border ${
+          template.channel === 'EMAIL' ? 'bg-blue-50/50 text-blue-600 border-blue-100' : 
+          (template.channel === 'PROMPT' ? 'bg-purple-50/50 text-purple-600 border-purple-100' : 'bg-emerald-50/50 text-emerald-600 border-emerald-100')
+        }`}>
+          {template.channel === 'EMAIL' ? 'Email' : (template.channel === 'PROMPT' ? 'Prompt' : 'Chat')}
+        </span>
+    </div>
+    
+    <h3 className="font-serif text-2xl italic leading-none mb-3 text-gray-900 group-hover:text-black transition-colors pr-6">
+        <HighlightedText text={template.title} highlight={searchQuery} />
+    </h3>
+    
+    <p className="text-xs font-sans text-gray-500 line-clamp-3 leading-relaxed mt-auto">
+        <HighlightedText text={template.description || ''} highlight={searchQuery} />
+    </p>
+  </motion.button>
+);
+
 const App: React.FC = () => {
   const {
     selectedCategory, setSelectedCategory,
@@ -130,101 +172,131 @@ const App: React.FC = () => {
             <div className="w-10"></div> {/* Spacer for center alignment */}
           </header>
 
-          <div className="flex-1 flex overflow-hidden w-full relative lg:p-4">
+          <div className="flex-1 flex overflow-hidden w-full relative">
             <AnimatePresence mode="wait">
               {/* LIST VIEW */}
               {!selectedTemplate ? (
                 <motion.div 
                   key="list-view"
-                  initial={{ opacity: 0, scale: 0.98, y: 10 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.98, y: -10, filter: 'blur(4px)' }}
-                  transition={{ duration: 0.4, ease: [0.2, 0.65, 0.3, 0.9] }}
-                  className="flex flex-col w-full h-full max-w-5xl mx-auto bg-white/60 backdrop-blur-xl lg:rounded-2xl overflow-hidden border border-white/40 shadow-sm"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0, filter: 'blur(4px)' }}
+                  transition={{ duration: 0.3 }}
+                  className="flex flex-col w-full h-full"
                 >
-                  <div className="px-6 pt-10 pb-4 shrink-0 z-10">
-                      <div className="flex flex-col gap-2">
-                        <span className="text-editorial-label text-gray-500 pl-0.5">{debouncedSearchQuery ? 'Pesquisa' : 'Categoria'}</span>
-                        <motion.h2 layout="position" className="text-editorial-title text-black tracking-tight truncate pr-2">{currentCategoryName}</motion.h2>
-                      </div>
-                  </div>
+                  <div className="flex-1 overflow-y-auto custom-scrollbar px-6 md:px-12 lg:px-16 pt-6 md:pt-10 pb-10">
+                    <div className="max-w-7xl mx-auto w-full space-y-8">
+                      
+                      {/* Header Section */}
+                      <div className="flex flex-col gap-6">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-editorial-label text-gray-400 pl-0.5 uppercase tracking-widest">{debouncedSearchQuery ? 'Pesquisa' : 'Categoria'}</span>
+                          <motion.h2 layout="position" className="text-5xl md:text-6xl lg:text-7xl font-serif italic text-black tracking-tight leading-[0.9]">{currentCategoryName}</motion.h2>
+                        </div>
 
-                  {/* Search Bar */}
-                  <div className="px-6 pb-6 shrink-0 z-30 relative">
-                    <div className={`relative group flex items-center w-full max-w-2xl rounded-xl transition-all duration-300 ease-out border bg-white ${isSearchFocused ? 'border-black/20 shadow-sm ring-2 ring-black/5' : 'border-black/5'}`}>
-                      <div className="pl-4 text-gray-400"><Search size={18} /></div>
-                      <input 
-                        ref={searchInputRef}
-                        type="text"
-                        placeholder="Buscar modelo..."
-                        value={searchQuery}
-                        onFocus={() => { setIsSearchFocused(true); setActiveSuggestionIndex(-1); }}
-                        onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-3 pr-12 py-3 bg-transparent border-none focus:ring-0 outline-none text-[#1a1a1a] text-sm font-sans"
-                      />
-                      <div className="absolute right-3">
-                        {searchQuery ? (
-                            <button onClick={() => { setSearchQuery(''); searchInputRef.current?.focus(); }} className="p-1 rounded-full bg-black/5 hover:bg-black hover:text-white text-gray-500 transition-colors"><X size={12} /></button>
-                          ) : (!isMobile && !isSearchFocused && (
-                              <div className="pointer-events-none flex items-center gap-0.5 px-2 py-1 rounded-md bg-gray-100 border border-black/5 text-[10px] font-sans font-medium text-gray-400"><Command size={9} /><span>K</span></div>
-                          ))}
+                        {/* Search Bar - Full Width & Clean */}
+                        <div className={`relative group flex items-center w-full rounded-xl transition-all duration-300 ease-out border bg-white ${isSearchFocused ? 'border-black/20 shadow-lg ring-2 ring-black/5' : 'border-gray-200 shadow-sm hover:border-gray-300'}`}>
+                          <div className="pl-4 text-gray-400"><Search size={20} /></div>
+                          <input 
+                            ref={searchInputRef}
+                            type="text"
+                            placeholder="Buscar modelo por título, conteúdo ou tag..."
+                            value={searchQuery}
+                            onFocus={() => { setIsSearchFocused(true); setActiveSuggestionIndex(-1); }}
+                            onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-3 pr-12 py-4 bg-transparent border-none focus:ring-0 outline-none text-gray-800 text-base font-sans placeholder:text-gray-300"
+                          />
+                          <div className="absolute right-4">
+                            {searchQuery ? (
+                                <button onClick={() => { setSearchQuery(''); searchInputRef.current?.focus(); }} className="p-1 rounded-full bg-black/5 hover:bg-black hover:text-white text-gray-500 transition-colors"><X size={14} /></button>
+                              ) : (!isMobile && !isSearchFocused && (
+                                  <div className="pointer-events-none flex items-center gap-1 px-2 py-1 rounded-md bg-gray-50 border border-black/5 text-[10px] font-sans font-medium text-gray-400"><Command size={10} /><span>K</span></div>
+                              ))}
+                          </div>
+                          
+                          {/* Search Suggestions Dropdown */}
+                          <AnimatePresence>
+                            {isSearchFocused && suggestions.length > 0 && (
+                              <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute left-0 right-0 top-[calc(100%+8px)] bg-white border border-gray-100 shadow-2xl rounded-xl z-50 overflow-hidden">
+                                  {suggestions.map((sug, idx) => (
+                                    <button key={sug.id} onClick={() => handleSuggestionClick(sug)} className="w-full text-left px-5 py-4 hover:bg-gray-50 flex items-center justify-between text-sm text-gray-700 border-b border-gray-50 last:border-0">
+                                      <HighlightedText text={sug.title} highlight={searchQuery} />
+                                    </button>
+                                  ))}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      </div>
+
+                      {/* Content Area */}
+                      <div className="min-h-[50vh]">
+                        {filteredTemplates.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-24 text-center border border-dashed border-gray-200 rounded-2xl bg-gray-50/50">
+                              <p className="font-serif italic text-3xl text-gray-300 mb-2">Sem resultados</p>
+                              <p className="text-sm text-gray-400">Não encontramos nada para "{searchQuery}"</p>
+                            </div>
+                        ) : (
+                            // Conditional Layout: Grouped vs Grid
+                            (selectedCategory === 'all' && !debouncedSearchQuery) ? (
+                                <div className="space-y-16 pb-12">
+                                  {CATEGORIES.map(category => {
+                                    const categoryTemplates = filteredTemplates.filter(t => t.category === category.id);
+                                    if (categoryTemplates.length === 0) return null;
+                                    
+                                    return (
+                                      <motion.div 
+                                        key={category.id} 
+                                        initial={{ opacity: 0, y: 20 }}
+                                        whileInView={{ opacity: 1, y: 0 }}
+                                        viewport={{ once: true, margin: "-50px" }}
+                                        className="space-y-6"
+                                      >
+                                          <div className="flex items-center gap-4">
+                                            <h3 className="text-2xl font-serif italic text-black">{category.name}</h3>
+                                            <div className="h-px bg-gray-200 flex-1"></div>
+                                            <span className="text-[10px] font-sans font-medium text-gray-400 uppercase tracking-widest">{categoryTemplates.length} Modelos</span>
+                                          </div>
+                                          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                                            {categoryTemplates.map(template => (
+                                                <TemplateCard 
+                                                  key={template.id} 
+                                                  template={template} 
+                                                  searchQuery={debouncedSearchQuery}
+                                                  onClick={() => setSelectedTemplate(template)}
+                                                />
+                                            ))}
+                                          </div>
+                                      </motion.div>
+                                    )
+                                  })}
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 pb-12">
+                                  {filteredTemplates.map((template) => (
+                                      <TemplateCard 
+                                        key={template.id} 
+                                        template={template} 
+                                        searchQuery={debouncedSearchQuery}
+                                        onClick={() => setSelectedTemplate(template)}
+                                      />
+                                  ))}
+                                </div>
+                            )
+                        )}
                       </div>
                     </div>
-                    <AnimatePresence>
-                      {isSearchFocused && suggestions.length > 0 && (
-                        <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute left-6 right-6 max-w-2xl top-[calc(100%+4px)] bg-white border border-gray-200 shadow-xl rounded-xl z-50 overflow-hidden">
-                            {suggestions.map((sug, idx) => (
-                              <button key={sug.id} onClick={() => handleSuggestionClick(sug)} className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center justify-between text-sm text-gray-700">
-                                <HighlightedText text={sug.title} highlight={searchQuery} />
-                              </button>
-                            ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-
-                  {/* Native Scroll List (Performance Optimized) */}
-                  <div className="flex-1 overflow-y-auto custom-scrollbar relative z-10 px-4 pb-6">
-                    {filteredTemplates.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-20 text-center px-8">
-                          <p className="font-serif italic text-2xl text-black/40 mb-2">Sem resultados</p>
-                          <p className="text-xs text-gray-500">Tente buscar por outro termo.</p>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                          {filteredTemplates.map((template, index) => (
-                              <motion.button
-                                key={template.id}
-                                layoutId={`card-${template.id}`}
-                                onClick={() => setSelectedTemplate(template)}
-                                className="w-full h-full flex flex-col items-start text-left p-6 rounded-xl transition-all duration-300 border bg-transparent border-transparent hover:bg-white hover:shadow-md hover:border-black/5 group"
-                              >
-                                <div className="flex w-full justify-between items-start mb-3">
-                                    <span className={`text-[9px] font-bold tracking-wider uppercase px-2 py-0.5 rounded bg-black/5 text-gray-500 group-hover:bg-black group-hover:text-white transition-colors`}>
-                                      {template.channel === 'EMAIL' ? 'Email' : (template.channel === 'PROMPT' ? 'Prompt' : 'Chat')}
-                                    </span>
-                                </div>
-                                <h3 className="font-serif text-xl italic leading-tight mb-2 text-gray-800 group-hover:text-black">
-                                    <HighlightedText text={template.title} highlight={debouncedSearchQuery} />
-                                </h3>
-                                <p className="text-[11px] text-gray-500 line-clamp-3 leading-relaxed mt-auto">
-                                    <HighlightedText text={template.description || ''} highlight={debouncedSearchQuery} />
-                                </p>
-                              </motion.button>
-                          ))}
-                        </div>
-                    )}
                   </div>
                 </motion.div>
               ) : (
                 /* EDITOR VIEW */
                 <motion.div
                   key="editor-view"
-                  className="flex-1 h-full min-w-0 w-full relative bg-transparent"
-                  initial={{ opacity: 0, scale: 0.95 }}
+                  className="flex-1 h-full min-w-0 w-full relative bg-transparent p-0 lg:p-4"
+                  initial={{ opacity: 0, scale: 0.98 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
+                  exit={{ opacity: 0, scale: 0.98 }}
                   transition={{ duration: 0.4, ease: [0.2, 0.65, 0.3, 0.9] }}
                 >
                    <Editor template={selectedTemplate} onClose={() => setSelectedTemplate(null)} />
