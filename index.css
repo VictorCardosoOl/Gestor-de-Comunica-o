@@ -54,6 +54,15 @@ body {
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1cdc7; border-radius: 4px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #a8a49e; }
 
+/* Hide Scrollbar Utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
 /* Typography Helpers */
 .font-serif { font-family: var(--font-serif); }
 .font-sans { font-family: var(--font-sans); }

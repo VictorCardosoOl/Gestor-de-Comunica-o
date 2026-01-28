@@ -11,6 +11,8 @@ interface EditorProps {
   onClose: () => void;
 }
 
+const TRANSITION_EASE = [0.16, 1, 0.3, 1];
+
 export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
   const {
     subject, setSubject,
@@ -68,7 +70,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
            <motion.div 
              initial={false}
              animate={{ width: showVariables ? 380 : 0, opacity: showVariables ? 1 : 0 }}
-             transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+             transition={{ duration: 0.35, ease: TRANSITION_EASE }}
              className="hidden lg:block h-full border-l border-[#e6e4e1] relative overflow-hidden"
            >
              <div className="absolute inset-0 w-[380px]">
@@ -99,7 +101,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                 initial={{ y: "100%" }}
                 animate={{ y: 0 }}
                 exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                transition={{ type: "spring", damping: 30, stiffness: 350 }}
                 className="fixed inset-x-0 bottom-0 z-50 bg-[#fdfcfb] rounded-t-[24px] shadow-2xl h-[75vh] flex flex-col overflow-hidden lg:hidden"
               >
                 <div className="flex items-center justify-between px-6 py-5 border-b border-[#e6e4e1] shrink-0">
@@ -126,7 +128,10 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
         {!isScenarioMode && (
           <div className="absolute bottom-8 right-8 z-30 flex flex-col items-end gap-4 pointer-events-none">
             {secondaryContent && (
-              <button 
+              <motion.button 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.1, type: "spring", stiffness: 400, damping: 20 }}
                 onClick={() => copyToClipboard(secondaryContent, 'sec-float')} 
                 className={`
                   pointer-events-auto flex items-center gap-3 px-5 py-3 rounded-full shadow-lg border backdrop-blur-sm transition-all duration-300 hover:scale-105
@@ -139,10 +144,13 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                 <span className="text-xs font-bold uppercase tracking-wider">
                   {isCopied('sec-float') ? 'Copiado' : (template.secondaryLabel || 'Protocolo')}
                 </span>
-              </button>
+              </motion.button>
             )}
 
-            <button 
+            <motion.button 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.05, type: "spring", stiffness: 400, damping: 20 }}
               onClick={() => copyToClipboard(content, 'main-float')} 
               className={`
                 pointer-events-auto flex items-center gap-3 px-8 py-4 rounded-full shadow-2xl border transition-all duration-300 hover:scale-105 active:scale-95
@@ -155,7 +163,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
               <span className="text-sm font-bold uppercase tracking-widest">
                 {isCopied('main-float') ? 'Copiado' : 'Copiar Texto'}
               </span>
-            </button>
+            </motion.button>
           </div>
         )}
       </div>

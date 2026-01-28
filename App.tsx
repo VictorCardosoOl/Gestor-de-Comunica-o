@@ -8,6 +8,10 @@ import { useDebounce } from './hooks/useDebounce';
 import { getAccentInsensitiveRegex } from './utils/textUtils';
 import { useAppContext } from './contexts/AppContext';
 
+// --- ANIMATION CONSTANTS ---
+const TRANSITION_EASE = [0.16, 1, 0.3, 1]; // "Airy" ease (Modified Expo)
+const STAGGER_DELAY = 0.03;
+
 // --- COMPONENTS ---
 
 const HighlightedText = React.memo(({ text, highlight, className }: { text: string, highlight: string, className?: string }) => {
@@ -36,9 +40,13 @@ interface TemplateCardProps {
 
 const TemplateCard: React.FC<TemplateCardProps> = ({ template, searchQuery, onClick, index }) => (
   <motion.div
-    initial={{ opacity: 0, y: 20 }}
+    initial={{ opacity: 0, y: 10 }} // Reduced from 20 for lightness
     animate={{ opacity: 1, y: 0 }}
-    transition={{ delay: index * 0.05, duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+    transition={{ 
+      delay: index * STAGGER_DELAY, 
+      duration: 0.4, 
+      ease: TRANSITION_EASE 
+    }}
     onClick={onClick}
     className="group relative flex flex-col p-6 h-full bg-white rounded-[20px] border border-transparent hover:border-[#e6e4e1] transition-all duration-300 hover:shadow-xl hover:shadow-black/5 cursor-pointer overflow-hidden"
   >
@@ -152,10 +160,10 @@ const App: React.FC = () => {
             {!selectedTemplate ? (
               <motion.div 
                 key="list-view"
-                initial={{ opacity: 0, scale: 0.98 }}
+                initial={{ opacity: 0, scale: 0.99 }} // Subtle scale up
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.98, filter: "blur(10px)" }}
-                transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+                exit={{ opacity: 0, scale: 0.99, transition: { duration: 0.2 } }}
+                transition={{ duration: 0.4, ease: TRANSITION_EASE }}
                 className="flex flex-col w-full h-full"
               >
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -164,12 +172,22 @@ const App: React.FC = () => {
                     {/* Editorial Hero Section */}
                     <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-8 mb-16 border-b border-[#e6e4e1] pb-8">
                       <div className="max-w-2xl">
-                        <span className="text-xs font-sans font-bold text-[#a8a49e] uppercase tracking-[0.2em] mb-3 block">
+                        <motion.span 
+                          initial={{ opacity: 0, y: 5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.1, duration: 0.5 }}
+                          className="text-xs font-sans font-bold text-[#a8a49e] uppercase tracking-[0.2em] mb-3 block"
+                        >
                           {categoryInfo.subtitle}
-                        </span>
-                        <h2 className="text-5xl md:text-7xl font-serif italic-editorial text-[#1a1918] leading-[0.9] tracking-tight">
+                        </motion.span>
+                        <motion.h2 
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.2, duration: 0.6, ease: TRANSITION_EASE }}
+                          className="text-5xl md:text-7xl font-serif italic-editorial text-[#1a1918] leading-[0.9] tracking-tight"
+                        >
                           {categoryInfo.title}
-                        </h2>
+                        </motion.h2>
                       </div>
 
                       {/* Search Input - Minimalist */}
@@ -180,7 +198,7 @@ const App: React.FC = () => {
                          <input 
                            ref={searchInputRef}
                            type="text"
-                           placeholder="Buscar por termo, título ou conteúdo..."
+                           placeholder="Buscar..."
                            value={searchQuery}
                            onChange={(e) => setSearchQuery(e.target.value)}
                            className="w-full pl-8 pr-8 py-3 bg-transparent border-b border-[#e6e4e1] text-lg font-serif italic text-[#1a1918] focus:outline-none focus:border-black transition-colors placeholder:font-sans placeholder:not-italic"
@@ -196,7 +214,7 @@ const App: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Grid Layout - Bento/Magazine Style */}
+                    {/* Grid Layout */}
                     <div className="min-h-[50vh]">
                       {filteredTemplates.length === 0 ? (
                           <div className="flex flex-col items-center justify-center py-32 text-center opacity-50">
@@ -221,14 +239,14 @@ const App: React.FC = () => {
                 </div>
               </motion.div>
             ) : (
-              /* --- EDITOR VIEW --- */
+              /* --- EDITOR VIEW (Lighter Transition) --- */
               <motion.div
                 key="editor-view"
                 className="absolute inset-0 z-20 bg-[#fdfcfb] flex flex-col"
-                initial={{ opacity: 0, y: "100%" }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: "100%" }}
-                transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                initial={{ opacity: 0, y: 15, scale: 0.99 }} // Subtle offset instead of full slide
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 15, scale: 0.99 }}
+                transition={{ duration: 0.35, ease: TRANSITION_EASE }}
               >
                  <Editor template={selectedTemplate} onClose={() => setSelectedTemplate(null)} />
               </motion.div>

@@ -69,7 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 flex flex-col gap-3 w-full px-2 py-4 overflow-y-auto custom-scrollbar no-scrollbar">
+        <nav className="flex-1 flex flex-col gap-3 w-full px-2 py-4 overflow-y-auto no-scrollbar overflow-x-hidden">
             <DockItem 
               id="all"
               label="Overview"
@@ -119,13 +119,14 @@ const DockItem: React.FC<{
 
   return (
     <div className="relative flex items-center justify-center group">
-      {/* Tooltip (Desktop Only) */}
+      {/* Tooltip (Desktop Only) - Snappy appearance */}
       <AnimatePresence>
         {isHovered && (
           <motion.div 
-            initial={{ opacity: 0, x: 10, scale: 0.9 }}
-            animate={{ opacity: 1, x: 20, scale: 1 }}
-            exit={{ opacity: 0, x: 10, scale: 0.9 }}
+            initial={{ opacity: 0, x: 5, scale: 0.95 }}
+            animate={{ opacity: 1, x: 15, scale: 1 }}
+            exit={{ opacity: 0, x: 5, scale: 0.95 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
             className="absolute left-full bg-[#1a1918] text-white text-[10px] font-medium tracking-wider uppercase px-2 py-1 rounded-md whitespace-nowrap z-50 pointer-events-none"
           >
             {label}
@@ -140,15 +141,16 @@ const DockItem: React.FC<{
         onMouseEnter={() => setHoveredId(id)}
         onMouseLeave={() => setHoveredId(null)}
         className={`
-          relative w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-300
+          relative w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-200
           ${isSelected ? 'bg-white shadow-md text-black' : 'text-gray-400 hover:text-gray-900 hover:bg-white/50'}
         `}
       >
-        <Icon size={20} strokeWidth={1.5} className={`transition-transform duration-300 ${isHovered ? 'scale-110' : 'scale-100'}`} />
+        <Icon size={20} strokeWidth={1.5} className={`transition-transform duration-200 ${isHovered ? 'scale-105' : 'scale-100'}`} />
         
         {isSelected && (
           <motion.div 
             layoutId="active-dot"
+            transition={{ type: "spring", stiffness: 500, damping: 30 }} // Snappier spring
             className="absolute -right-1 top-1 w-2 h-2 bg-black rounded-full border-2 border-white"
           />
         )}
