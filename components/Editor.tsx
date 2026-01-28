@@ -11,7 +11,8 @@ interface EditorProps {
   onClose: () => void;
 }
 
-const TRANSITION_EASE = [0.16, 1, 0.3, 1];
+// Optimized easing for faster, lightweight feel
+const FAST_EASE = [0.25, 0.1, 0.25, 1];
 
 // Staggered Animation Container
 const containerVariants: Variants = {
@@ -19,28 +20,28 @@ const containerVariants: Variants = {
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.1
+      staggerChildren: 0.05, // Reduced from 0.1 for snappier load
+      delayChildren: 0.05
     }
   }
 };
 
 const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 15 },
+  hidden: { opacity: 0, y: 10 }, // Reduced travel distance
   visible: { 
     opacity: 1, 
     y: 0,
-    transition: { type: "spring", stiffness: 300, damping: 24 }
+    transition: { duration: 0.4, ease: FAST_EASE } // Replaced spring with ease
   }
 };
 
 const fabVariants: Variants = {
-  hidden: { opacity: 0, scale: 0.8, y: 20 },
+  hidden: { opacity: 0, scale: 0.9, y: 10 },
   visible: { 
     opacity: 1, 
     scale: 1, 
     y: 0,
-    transition: { type: "spring", stiffness: 400, damping: 25 }
+    transition: { duration: 0.3, ease: "easeOut" }
   }
 };
 
@@ -110,7 +111,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
            <motion.div 
              initial={false}
              animate={{ width: showVariables ? 380 : 0, opacity: showVariables ? 1 : 0 }}
-             transition={{ duration: 0.35, ease: TRANSITION_EASE }}
+             transition={{ duration: 0.3, ease: FAST_EASE }}
              className="hidden lg:block h-full border-l border-[#e6e4e1] relative overflow-hidden"
            >
              <div className="absolute inset-0 w-[380px]">
@@ -141,7 +142,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                 initial={{ y: "100%" }}
                 animate={{ y: 0 }}
                 exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 30, stiffness: 350 }}
+                transition={{ type: "spring", damping: 30, stiffness: 300 }} // Keep spring for drag/slide feel on mobile
                 className="fixed inset-x-0 bottom-0 z-50 bg-[#fdfcfb] rounded-t-[24px] shadow-2xl h-[75vh] flex flex-col overflow-hidden lg:hidden"
               >
                 <div className="flex items-center justify-between px-6 py-5 border-b border-[#e6e4e1] shrink-0">
@@ -172,7 +173,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                 variants={fabVariants}
                 onClick={() => copyToClipboard(secondaryContent, 'sec-float')} 
                 className={`
-                  pointer-events-auto flex items-center gap-3 px-5 py-3 rounded-full shadow-lg border backdrop-blur-sm transition-all duration-300 hover:scale-105
+                  pointer-events-auto flex items-center gap-3 px-5 py-3 rounded-full shadow-lg border backdrop-blur-sm transition-all duration-200 hover:scale-105
                   ${isCopied('sec-float') 
                     ? 'bg-emerald-600 text-white border-emerald-600' 
                     : 'bg-white/90 text-[#1a1918] border-[#e6e4e1] hover:border-[#1a1918]'}
@@ -189,7 +190,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
               variants={fabVariants}
               onClick={() => copyToClipboard(content, 'main-float')} 
               className={`
-                pointer-events-auto flex items-center gap-3 px-8 py-4 rounded-full shadow-2xl border transition-all duration-300 hover:scale-105 active:scale-95
+                pointer-events-auto flex items-center gap-3 px-8 py-4 rounded-full shadow-2xl border transition-all duration-200 hover:scale-105 active:scale-95
                 ${isCopied('main-float') 
                   ? 'bg-emerald-600 text-white border-emerald-600' 
                   : 'bg-[#1a1918] text-white border-[#1a1918] hover:bg-black'}

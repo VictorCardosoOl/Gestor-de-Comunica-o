@@ -23,12 +23,15 @@ export const EditorHeader = memo<EditorHeaderProps>(({
         <button 
           onClick={onClose} 
           className="group flex items-center gap-2 text-[#6e6b66] hover:text-[#1a1918] transition-colors"
-          title="Voltar"
+          title="Voltar (ESC)"
         >
           <div className="w-10 h-10 rounded-full border border-[#e6e4e1] flex items-center justify-center group-hover:border-[#1a1918] transition-colors">
              <MoveLeft size={18} />
           </div>
-          <span className="hidden md:block text-xs font-bold uppercase tracking-widest">Voltar</span>
+          <span className="hidden md:flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
+            Voltar
+            <span className="hidden lg:inline-flex items-center justify-center px-1.5 py-0.5 border border-[#e6e4e1] rounded text-[9px] text-[#a8a49e] font-sans">ESC</span>
+          </span>
         </button>
         
         <div className="flex flex-col min-w-0 border-l border-[#e6e4e1] pl-6">

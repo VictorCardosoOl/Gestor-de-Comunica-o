@@ -9,34 +9,35 @@ import { getAccentInsensitiveRegex } from './utils/textUtils';
 import { useAppContext } from './contexts/AppContext';
 
 // --- ANIMATION CONSTANTS ---
-const STAGGER_DELAY = 0.03;
+const STAGGER_DELAY = 0.02; // Faster stagger
+const TRANSITION_EASE = [0.25, 0.1, 0.25, 1]; // Swift ease-out curve (CSS friendly)
 
 const pageVariants = {
-  listInitial: { opacity: 0, scale: 0.98, y: 10 },
+  listInitial: { opacity: 0, scale: 0.99, y: 10 },
   listAnimate: { 
     opacity: 1, 
     scale: 1, 
     y: 0,
-    transition: { type: "spring", stiffness: 350, damping: 35 } 
+    transition: { duration: 0.4, ease: TRANSITION_EASE } 
   },
   listExit: { 
     opacity: 0, 
-    scale: 0.96, 
-    filter: "blur(4px)",
-    transition: { duration: 0.3, ease: [0.32, 0.72, 0, 1] } 
+    scale: 0.99, 
+    // Removed blur filter for performance
+    transition: { duration: 0.2, ease: "easeIn" } 
   },
-  editorInitial: { opacity: 0, y: 40, scale: 0.98 },
+  editorInitial: { opacity: 0, y: 30, scale: 0.99 },
   editorAnimate: { 
     opacity: 1, 
     y: 0, 
     scale: 1,
-    transition: { type: "spring", stiffness: 300, damping: 30, mass: 0.8 } 
+    transition: { duration: 0.4, ease: TRANSITION_EASE } 
   },
   editorExit: { 
     opacity: 0, 
-    y: 40, 
-    scale: 0.98,
-    transition: { duration: 0.25, ease: "easeIn" } 
+    y: 30, 
+    scale: 0.99,
+    transition: { duration: 0.2, ease: "easeIn" } 
   }
 };
 
@@ -68,17 +69,16 @@ interface TemplateCardProps {
 
 const TemplateCard: React.FC<TemplateCardProps> = ({ template, searchQuery, onClick, index }) => (
   <motion.div
-    layoutId={`card-${template.id}`}
-    initial={{ opacity: 0, y: 15 }} 
+    // Removed layoutId to prevent heavy layout projection calculations
+    initial={{ opacity: 0, y: 20 }} 
     animate={{ opacity: 1, y: 0 }}
     transition={{ 
-      delay: index * STAGGER_DELAY, 
-      type: "spring",
-      stiffness: 400,
-      damping: 40
+      duration: 0.4,
+      delay: Math.min(index * STAGGER_DELAY, 0.2), // Cap delay so bottom items don't take forever
+      ease: "easeOut"
     }}
     onClick={onClick}
-    className="group relative flex flex-col p-6 h-full bg-white rounded-[20px] border border-transparent hover:border-[#e6e4e1] transition-all duration-300 hover:shadow-xl hover:shadow-black/5 cursor-pointer overflow-hidden"
+    className="group relative flex flex-col p-6 h-full bg-white rounded-[20px] border border-transparent hover:border-[#e6e4e1] transition-all duration-200 hover:shadow-xl hover:shadow-black/5 cursor-pointer overflow-hidden will-change-transform"
   >
     <div className="flex justify-between items-start mb-4">
       <span className={`
@@ -128,18 +128,50 @@ const App: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, [setIsSidebarOpen]);
 
-  // Keyboard Shortcut for Search (Cmd+K / Ctrl+K)
+  // --- GLOBAL KEYBOARD SHORTCUTS MANAGER ---
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // 1. SEARCH SHORTCUT (Cmd+K / Ctrl+K)
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        searchInputRef.current?.focus();
+        
+        // If we are deep in an editor, close it first
+        if (selectedTemplate) {
+          setSelectedTemplate(null);
+          // Use a tiny timeout to allow state to update and view to swap before focusing
+          setTimeout(() => searchInputRef.current?.focus(), 50);
+        } else {
+          // Otherwise just focus immediately
+          searchInputRef.current?.focus();
+        }
+      }
+
+      // 2. ESCAPE SHORTCUT
+      if (e.key === 'Escape') {
+        // Priority 1: If Editor is open, close it
+        if (selectedTemplate) {
+          e.preventDefault();
+          setSelectedTemplate(null);
+          return;
+        }
+
+        // Priority 2: If Search is focused, blur it
+        if (document.activeElement === searchInputRef.current) {
+          searchInputRef.current?.blur();
+          return;
+        }
+
+        // Priority 3: If Search has text (but not focused), clear it
+        if (searchQuery) {
+          setSearchQuery('');
+          return;
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [selectedTemplate, searchQuery, setSelectedTemplate, setSearchQuery]);
 
   const normalizeText = (str: string) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "";
 
@@ -179,7 +211,7 @@ const App: React.FC = () => {
       {/* Main "Window" Container */}
       <main 
         className={`
-          flex-1 flex flex-col h-full overflow-hidden relative transition-all duration-500 ease-[0.23,1,0.32,1]
+          flex-1 flex flex-col h-full overflow-hidden relative transition-all duration-300 ease-out
           ${isMobile ? 'bg-[#f2f0ed]' : 'my-4 mr-4 ml-24 rounded-[24px] border border-white/50 bg-[#fdfcfb] shadow-2xl shadow-[#1a1918]/5'}
         `}
       >
@@ -207,7 +239,7 @@ const App: React.FC = () => {
                 initial="listInitial"
                 animate="listAnimate"
                 exit="listExit"
-                className="flex flex-col w-full h-full"
+                className="flex flex-col w-full h-full will-change-transform"
               >
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
                   <div className="max-w-[1400px] mx-auto w-full px-6 py-8 md:px-12 md:py-12">
@@ -218,7 +250,7 @@ const App: React.FC = () => {
                         <motion.span 
                           initial={{ opacity: 0, y: 5 }}
                           animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.1, duration: 0.5 }}
+                          transition={{ delay: 0.1, duration: 0.4 }}
                           className="text-xs font-sans font-bold text-[#a8a49e] uppercase tracking-[0.2em] mb-3 block"
                         >
                           {categoryInfo.subtitle}
@@ -226,7 +258,7 @@ const App: React.FC = () => {
                         <motion.h2 
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.2, duration: 0.6, type: "spring", stiffness: 100 }}
+                          transition={{ delay: 0.1, duration: 0.5, ease: "easeOut" }}
                           className="text-5xl md:text-7xl font-serif italic-editorial text-[#1a1918] leading-[0.9] tracking-tight"
                         >
                           {categoryInfo.title}
@@ -299,7 +331,7 @@ const App: React.FC = () => {
                 initial="editorInitial"
                 animate="editorAnimate"
                 exit="editorExit"
-                className="absolute inset-0 z-20 bg-[#fdfcfb] flex flex-col"
+                className="absolute inset-0 z-20 bg-[#fdfcfb] flex flex-col will-change-transform"
               >
                  <Editor template={selectedTemplate} onClose={() => setSelectedTemplate(null)} />
               </motion.div>
