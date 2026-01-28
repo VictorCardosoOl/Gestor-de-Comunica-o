@@ -2,10 +2,9 @@ import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Editor } from './components/Editor';
 import { INITIAL_TEMPLATES, CATEGORIES } from './constants';
-import { Search, X, Loader2, FileText, ChevronRight, Command } from 'lucide-react';
+import { Search, X, Loader2, FileText, ChevronRight, Command, Menu } from 'lucide-react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { useDebounce } from './hooks/useDebounce';
-import StaggeredMenu from './components/StaggeredMenu';
 import { getAccentInsensitiveRegex } from './utils/textUtils';
 import { useAppContext } from './contexts/AppContext';
 
@@ -58,7 +57,6 @@ const App: React.FC = () => {
     else if (!selectedTemplate && !isMobile) setIsSidebarPinned(true);
   }, [selectedTemplate, isMobile, setIsSidebarPinned]);
 
-  const menuItems = useMemo(() => CATEGORIES.map(cat => ({ id: cat.id, label: cat.name })), []);
   const normalizeText = (str: string) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "";
 
   const suggestions = useMemo(() => {
@@ -96,30 +94,31 @@ const App: React.FC = () => {
   return (
     <LayoutGroup>
       <div className="flex h-[100dvh] w-full overflow-hidden text-[#111] font-sans bg-transparent relative">
-        {isMobile && (
-          <StaggeredMenu 
-            items={menuItems}
-            activeId={selectedCategory}
-            onSelectItem={(id) => { setSelectedCategory(id); setSearchQuery(''); setSelectedTemplate(null); }}
-            socialItems={[{ label: 'Wise System', link: 'https://wisesystem.com.br' }]}
-          />
-        )}
-
-        {!isMobile && (
-          <Sidebar 
-            selectedCategory={debouncedSearchQuery ? 'all' : selectedCategory} 
-            onSelectCategory={(id) => { setSelectedCategory(id); setSearchQuery(''); setSelectedTemplate(null); }}
-            isOpen={isSidebarOpen}
-            onCloseMobile={() => setIsSidebarOpen(false)}
-            isMobile={isMobile}
-            isPinned={isSidebarPinned}
-            onTogglePin={() => setIsSidebarPinned(!isSidebarPinned)}
-          />
-        )}
+        
+        {/* Unified Sidebar for Desktop and Mobile */}
+        <Sidebar 
+          selectedCategory={debouncedSearchQuery ? 'all' : selectedCategory} 
+          onSelectCategory={(id) => { setSelectedCategory(id); setSearchQuery(''); setSelectedTemplate(null); }}
+          isOpen={isSidebarOpen}
+          onCloseMobile={() => setIsSidebarOpen(false)}
+          isMobile={isMobile}
+          isPinned={isSidebarPinned}
+          onTogglePin={() => setIsSidebarPinned(!isSidebarPinned)}
+        />
 
         <main className="flex-1 flex flex-col h-full overflow-hidden relative z-10 transition-all duration-500">
-          <header className="lg:hidden flex items-center justify-center px-5 py-4 bg-white/0 sticky top-0 z-30 shrink-0 pointer-events-none">
-            <span className="font-serif italic text-xl font-medium tracking-tight text-black backdrop-blur-md bg-white/30 px-4 py-1 rounded-full border border-white/40 shadow-sm">QuickComms</span>
+          <header className="lg:hidden flex items-center justify-between px-5 py-4 bg-white/0 sticky top-0 z-30 shrink-0 pointer-events-none">
+            <div className="pointer-events-auto">
+               <button 
+                onClick={() => setIsSidebarOpen(true)}
+                className="p-2.5 bg-white/40 backdrop-blur-md border border-white/40 rounded-full shadow-sm text-black"
+                aria-label="Abrir Menu"
+               >
+                 <Menu size={20} strokeWidth={1.5} />
+               </button>
+            </div>
+            <span className="font-serif italic text-xl font-medium tracking-tight text-black backdrop-blur-md bg-white/30 px-4 py-1 rounded-full border border-white/40 shadow-sm pointer-events-auto">QuickComms</span>
+            <div className="w-10"></div> {/* Spacer for center alignment */}
           </header>
 
           <div className="flex-1 flex overflow-hidden w-full relative lg:p-4 lg:gap-4">

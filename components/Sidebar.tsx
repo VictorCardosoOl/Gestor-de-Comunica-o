@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { CATEGORIES } from '../constants';
 import { 
@@ -110,16 +109,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
     mobileClosed: { 
       x: "-100%", 
       width: "18rem", 
-      transition 
+      transition: { ...transition, damping: 25 }
     },
     mobileOpen: { 
       x: "0%", 
       width: "18rem",
-      transition 
+      transition: { ...transition, damping: 25 }
     },
     desktopCollapsed: { 
       x: "0%", 
-      width: "5rem", // Slightly narrower collapsed state
+      width: "5rem", 
       transition 
     },
     desktopExpanded: { 
@@ -160,8 +159,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           flex flex-col h-full 
           overflow-hidden
           bg-white/90
-          backdrop-blur-3xl
+          ${isMobile ? 'backdrop-blur-xl max-w-[85vw]' : 'backdrop-blur-3xl'}
           border-r border-black/5
+          shadow-2xl lg:shadow-none
         `}
         onMouseEnter={() => !isMobile && setIsHovered(true)}
         onMouseLeave={() => !isMobile && setIsHovered(false)}
@@ -316,7 +316,7 @@ const SidebarItem: React.FC<{
 
   return (
     <motion.button
-      layout="position" /* Enable Framer Motion Layout Animation */
+      layout="position" 
       variants={variants}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
@@ -325,7 +325,6 @@ const SidebarItem: React.FC<{
       className={`
         relative w-full flex items-center rounded-lg z-10 group
         ${!isExpanded ? 'justify-center py-3' : 'px-4 py-2.5 space-x-4'}
-        /* Use transition-none for layout to let Framer handle it, or keep smooth transition */
         transition-colors duration-300
         ${isSelected ? 'text-black' : 'text-gray-400 hover:text-black'}
       `}
@@ -351,7 +350,7 @@ const SidebarItem: React.FC<{
       )}
 
       <motion.span 
-        layout="position" /* Animate the icon moving from center to left */
+        layout="position" 
         className="shrink-0 flex items-center justify-center relative z-10"
       >
         <Icon size={20} strokeWidth={0.75} className={isSelected ? "text-black" : "text-gray-400 group-hover:text-black transition-colors"} />
@@ -363,7 +362,7 @@ const SidebarItem: React.FC<{
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -10 }}
-            transition={{ duration: 0.3, delay: 0.1 }} /* Slight delay to let width expand first */
+            transition={{ duration: 0.2 }}
             className={`
               text-[11px] font-sans tracking-wide whitespace-nowrap overflow-hidden relative z-10
               ${isSelected ? 'font-medium' : 'font-normal'}
