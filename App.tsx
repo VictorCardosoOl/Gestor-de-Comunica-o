@@ -9,8 +9,36 @@ import { getAccentInsensitiveRegex } from './utils/textUtils';
 import { useAppContext } from './contexts/AppContext';
 
 // --- ANIMATION CONSTANTS ---
-const TRANSITION_EASE = [0.16, 1, 0.3, 1]; // "Airy" ease (Modified Expo)
 const STAGGER_DELAY = 0.03;
+
+const pageVariants = {
+  listInitial: { opacity: 0, scale: 0.98, y: 10 },
+  listAnimate: { 
+    opacity: 1, 
+    scale: 1, 
+    y: 0,
+    transition: { type: "spring", stiffness: 350, damping: 35 } 
+  },
+  listExit: { 
+    opacity: 0, 
+    scale: 0.96, 
+    filter: "blur(4px)",
+    transition: { duration: 0.3, ease: [0.32, 0.72, 0, 1] } 
+  },
+  editorInitial: { opacity: 0, y: 40, scale: 0.98 },
+  editorAnimate: { 
+    opacity: 1, 
+    y: 0, 
+    scale: 1,
+    transition: { type: "spring", stiffness: 300, damping: 30, mass: 0.8 } 
+  },
+  editorExit: { 
+    opacity: 0, 
+    y: 40, 
+    scale: 0.98,
+    transition: { duration: 0.25, ease: "easeIn" } 
+  }
+};
 
 // --- COMPONENTS ---
 
@@ -40,12 +68,14 @@ interface TemplateCardProps {
 
 const TemplateCard: React.FC<TemplateCardProps> = ({ template, searchQuery, onClick, index }) => (
   <motion.div
-    initial={{ opacity: 0, y: 10 }} // Reduced from 20 for lightness
+    layoutId={`card-${template.id}`}
+    initial={{ opacity: 0, y: 15 }} 
     animate={{ opacity: 1, y: 0 }}
     transition={{ 
       delay: index * STAGGER_DELAY, 
-      duration: 0.4, 
-      ease: TRANSITION_EASE 
+      type: "spring",
+      stiffness: 400,
+      damping: 40
     }}
     onClick={onClick}
     className="group relative flex flex-col p-6 h-full bg-white rounded-[20px] border border-transparent hover:border-[#e6e4e1] transition-all duration-300 hover:shadow-xl hover:shadow-black/5 cursor-pointer overflow-hidden"
@@ -173,10 +203,10 @@ const App: React.FC = () => {
             {!selectedTemplate ? (
               <motion.div 
                 key="list-view"
-                initial={{ opacity: 0, scale: 0.99 }} // Subtle scale up
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.99, transition: { duration: 0.2 } }}
-                transition={{ duration: 0.4, ease: TRANSITION_EASE }}
+                variants={pageVariants}
+                initial="listInitial"
+                animate="listAnimate"
+                exit="listExit"
                 className="flex flex-col w-full h-full"
               >
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -196,7 +226,7 @@ const App: React.FC = () => {
                         <motion.h2 
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.2, duration: 0.6, ease: TRANSITION_EASE }}
+                          transition={{ delay: 0.2, duration: 0.6, type: "spring", stiffness: 100 }}
                           className="text-5xl md:text-7xl font-serif italic-editorial text-[#1a1918] leading-[0.9] tracking-tight"
                         >
                           {categoryInfo.title}
@@ -262,14 +292,14 @@ const App: React.FC = () => {
                 </div>
               </motion.div>
             ) : (
-              /* --- EDITOR VIEW (Lighter Transition) --- */
+              /* --- EDITOR VIEW (Enhanced Transition) --- */
               <motion.div
                 key="editor-view"
+                variants={pageVariants}
+                initial="editorInitial"
+                animate="editorAnimate"
+                exit="editorExit"
                 className="absolute inset-0 z-20 bg-[#fdfcfb] flex flex-col"
-                initial={{ opacity: 0, y: 15, scale: 0.99 }} // Subtle offset instead of full slide
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 15, scale: 0.99 }}
-                transition={{ duration: 0.35, ease: TRANSITION_EASE }}
               >
                  <Editor template={selectedTemplate} onClose={() => setSelectedTemplate(null)} />
               </motion.div>

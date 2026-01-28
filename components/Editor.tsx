@@ -1,6 +1,6 @@
 import React from 'react';
 import { Template } from '../types';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { useEditorLogic } from '../hooks/useEditorLogic';
 import { EditorHeader, VariablePanel, ContentArea } from './EditorComponents';
 import { Copy, Check, Layers, X } from 'lucide-react';
@@ -12,6 +12,37 @@ interface EditorProps {
 }
 
 const TRANSITION_EASE = [0.16, 1, 0.3, 1];
+
+// Staggered Animation Container
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.1
+    }
+  }
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 15 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: { type: "spring", stiffness: 300, damping: 24 }
+  }
+};
+
+const fabVariants: Variants = {
+  hidden: { opacity: 0, scale: 0.8, y: 20 },
+  visible: { 
+    opacity: 1, 
+    scale: 1, 
+    y: 0,
+    transition: { type: "spring", stiffness: 400, damping: 25 }
+  }
+};
 
 export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
   const {
@@ -39,30 +70,39 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
   }, []);
 
   return (
-    <div className="h-full flex flex-col relative overflow-hidden bg-[#fdfcfb]">
+    <motion.div 
+      className="h-full flex flex-col relative overflow-hidden bg-[#fdfcfb]"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
       {/* Header */}
-      <EditorHeader 
-        template={template} 
-        onClose={onClose} 
-        showVariables={showVariables}
-        onToggleVariables={() => setShowVariables(!showVariables)}
-        onReset={handleReset}
-        hasVariables={hasVariables}
-      />
+      <motion.div variants={itemVariants} className="z-20">
+        <EditorHeader 
+          template={template} 
+          onClose={onClose} 
+          showVariables={showVariables}
+          onToggleVariables={() => setShowVariables(!showVariables)}
+          onReset={handleReset}
+          hasVariables={hasVariables}
+        />
+      </motion.div>
 
       {/* Main Layout */}
       <div className="flex-1 flex overflow-hidden relative">
         
         {/* Content Area (Scrollable) */}
         <div className="flex-1 overflow-y-auto custom-scrollbar relative"> 
-           <ContentArea 
-             template={template}
-             subject={subject} setSubject={setSubject}
-             content={content} setContent={setContent}
-             secondaryContent={secondaryContent} setSecondaryContent={setSecondaryContent}
-             isScenarioMode={isScenarioMode}
-             scenarios={scenarios}
-           />
+           <motion.div variants={itemVariants}>
+             <ContentArea 
+               template={template}
+               subject={subject} setSubject={setSubject}
+               content={content} setContent={setContent}
+               secondaryContent={secondaryContent} setSecondaryContent={setSecondaryContent}
+               isScenarioMode={isScenarioMode}
+               scenarios={scenarios}
+             />
+           </motion.div>
         </div>
 
         {/* Variable Panel (Desktop Side-by-Side) */}
@@ -129,9 +169,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
           <div className="absolute bottom-8 right-8 z-30 flex flex-col items-end gap-4 pointer-events-none">
             {secondaryContent && (
               <motion.button 
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.1, type: "spring", stiffness: 400, damping: 20 }}
+                variants={fabVariants}
                 onClick={() => copyToClipboard(secondaryContent, 'sec-float')} 
                 className={`
                   pointer-events-auto flex items-center gap-3 px-5 py-3 rounded-full shadow-lg border backdrop-blur-sm transition-all duration-300 hover:scale-105
@@ -148,9 +186,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
             )}
 
             <motion.button 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.05, type: "spring", stiffness: 400, damping: 20 }}
+              variants={fabVariants}
               onClick={() => copyToClipboard(content, 'main-float')} 
               className={`
                 pointer-events-auto flex items-center gap-3 px-8 py-4 rounded-full shadow-2xl border transition-all duration-300 hover:scale-105 active:scale-95
@@ -167,6 +203,6 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 };
