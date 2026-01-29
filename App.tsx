@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Editor } from './components/Editor';
+import { CommandMenu } from './components/CommandMenu'; // New Component
 import { INITIAL_TEMPLATES, CATEGORIES } from './constants';
 import { Search, X, Menu, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -112,6 +113,7 @@ const App: React.FC = () => {
     selectedTemplate, setSelectedTemplate,
     searchQuery, setSearchQuery,
     isSidebarOpen, setIsSidebarOpen,
+    isSearchModalOpen, setIsSearchModalOpen // Using the new global state
   } = useAppContext();
 
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -131,47 +133,39 @@ const App: React.FC = () => {
   // --- GLOBAL KEYBOARD SHORTCUTS MANAGER ---
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // 1. SEARCH SHORTCUT (Cmd+K / Ctrl+K)
+      // 1. GLOBAL SEARCH (Cmd+K / Ctrl+K)
+      // Now opens the Modal instead of focusing the list input
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        
-        // If we are deep in an editor, close it first
-        if (selectedTemplate) {
-          setSelectedTemplate(null);
-          // Use a tiny timeout to allow state to update and view to swap before focusing
-          setTimeout(() => searchInputRef.current?.focus(), 50);
-        } else {
-          // Otherwise just focus immediately
-          searchInputRef.current?.focus();
-        }
+        setIsSearchModalOpen(true);
       }
 
       // 2. ESCAPE SHORTCUT
       if (e.key === 'Escape') {
-        // Priority 1: If Editor is open, close it
+        // Priority 1: If Modal is open, close it
+        if (isSearchModalOpen) {
+            e.preventDefault();
+            setIsSearchModalOpen(false);
+            return;
+        }
+
+        // Priority 2: If Editor is open, close it
         if (selectedTemplate) {
           e.preventDefault();
           setSelectedTemplate(null);
           return;
         }
-
-        // Priority 2: If Search is focused, blur it
-        if (document.activeElement === searchInputRef.current) {
-          searchInputRef.current?.blur();
-          return;
-        }
-
-        // Priority 3: If Search has text (but not focused), clear it
+        
+        // Priority 3: Clear standard search
         if (searchQuery) {
-          setSearchQuery('');
-          return;
+            setSearchQuery('');
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedTemplate, searchQuery, setSelectedTemplate, setSearchQuery]);
+  }, [selectedTemplate, searchQuery, isSearchModalOpen, setSelectedTemplate, setSearchQuery, setIsSearchModalOpen]);
 
   const normalizeText = (str: string) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "";
 
@@ -199,6 +193,9 @@ const App: React.FC = () => {
   return (
     <div className="flex h-[100dvh] w-full overflow-hidden relative">
       
+      {/* Global Command Menu Overlay */}
+      <CommandMenu />
+
       {/* Sidebar / Dock */}
       <Sidebar 
         selectedCategory={debouncedSearchQuery ? 'all' : selectedCategory} 
@@ -265,7 +262,7 @@ const App: React.FC = () => {
                         </motion.h2>
                       </div>
 
-                      {/* Search Input - Minimalist */}
+                      {/* Search Input - Minimalist (Still kept for List View usage) */}
                       <div className="relative w-full xl:w-96 group">
                          <div className={`absolute inset-y-0 left-0 pl-0 flex items-center pointer-events-none transition-colors duration-300 ${searchQuery ? 'text-black' : 'text-[#a8a49e]'}`}>
                             <Search size={20} strokeWidth={1.5} />
@@ -273,7 +270,7 @@ const App: React.FC = () => {
                          <input 
                            ref={searchInputRef}
                            type="text"
-                           placeholder="Buscar..."
+                           placeholder="Filtrar lista..."
                            value={searchQuery}
                            onChange={(e) => setSearchQuery(e.target.value)}
                            className="w-full pl-8 pr-8 py-3 bg-transparent border-b border-[#e6e4e1] text-lg font-serif italic text-[#1a1918] focus:outline-none focus:border-black transition-colors placeholder:font-sans placeholder:not-italic"
@@ -281,11 +278,14 @@ const App: React.FC = () => {
                          
                          {/* Shortcut Badge (Shown when empty and not focused) */}
                          {!searchQuery && (
-                            <div className="absolute inset-y-0 right-0 flex items-center pointer-events-none transition-opacity duration-300 opacity-100 group-focus-within:opacity-0">
+                            <button 
+                                onClick={() => setIsSearchModalOpen(true)}
+                                className="absolute inset-y-0 right-0 flex items-center transition-opacity duration-300 opacity-100 cursor-pointer"
+                            >
                                <span className="text-[10px] font-sans font-bold text-[#a8a49e] bg-[#f2f0ed] px-1.5 py-0.5 rounded-[4px] border border-[#d1cdc7]/50 tracking-wider">
                                  ⌘K
                                </span>
-                            </div>
+                            </button>
                          )}
 
                          {searchQuery && (
