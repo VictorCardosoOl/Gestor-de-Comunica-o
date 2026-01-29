@@ -20,18 +20,18 @@ const containerVariants: Variants = {
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.05, // Reduced from 0.1 for snappier load
+      staggerChildren: 0.05,
       delayChildren: 0.05
     }
   }
 };
 
 const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 10 }, // Reduced travel distance
+  hidden: { opacity: 0, y: 10 },
   visible: { 
     opacity: 1, 
     y: 0,
-    transition: { duration: 0.4, ease: FAST_EASE } // Replaced spring with ease
+    transition: { duration: 0.4, ease: FAST_EASE }
   }
 };
 
@@ -77,8 +77,8 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
       initial="hidden"
       animate="visible"
     >
-      {/* Header */}
-      <motion.div variants={itemVariants} className="z-20">
+      {/* Header - Fixed at top */}
+      <motion.div variants={itemVariants} className="z-20 shrink-0">
         <EditorHeader 
           template={template} 
           onClose={onClose} 
@@ -89,12 +89,12 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
         />
       </motion.div>
 
-      {/* Main Layout */}
-      <div className="flex-1 flex overflow-hidden relative">
+      {/* Main Layout - Flex container for Content + Sidebar */}
+      <div className="flex-1 flex flex-row overflow-hidden relative min-h-0">
         
         {/* Content Area (Scrollable) */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar relative"> 
-           <motion.div variants={itemVariants}>
+        <div className="flex-1 h-full overflow-y-auto custom-scrollbar relative"> 
+           <motion.div variants={itemVariants} className="min-h-full">
              <ContentArea 
                template={template}
                subject={subject} setSubject={setSubject}
@@ -112,9 +112,9 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
              initial={false}
              animate={{ width: showVariables ? 380 : 0, opacity: showVariables ? 1 : 0 }}
              transition={{ duration: 0.3, ease: FAST_EASE }}
-             className="hidden lg:block h-full border-l border-[#e6e4e1] relative overflow-hidden"
+             className="hidden lg:block h-full border-l border-[#e6e4e1] relative overflow-hidden shrink-0"
            >
-             <div className="absolute inset-0 w-[380px]">
+             <div className="absolute inset-0 w-[380px] h-full overflow-hidden">
                 <VariablePanel 
                   placeholders={placeholders} 
                   variableValues={variableValues} 
@@ -142,7 +142,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
                 initial={{ y: "100%" }}
                 animate={{ y: 0 }}
                 exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 30, stiffness: 300 }} // Keep spring for drag/slide feel on mobile
+                transition={{ type: "spring", damping: 30, stiffness: 300 }}
                 className="fixed inset-x-0 bottom-0 z-50 bg-[#fdfcfb] rounded-t-[24px] shadow-2xl h-[75vh] flex flex-col overflow-hidden lg:hidden"
               >
                 <div className="flex items-center justify-between px-6 py-5 border-b border-[#e6e4e1] shrink-0">
@@ -165,7 +165,7 @@ export const Editor: React.FC<EditorProps> = ({ template, onClose }) => {
           )}
         </AnimatePresence>
 
-        {/* FABs (Floating Action Buttons) - High Contrast Editorial Style */}
+        {/* FABs (Floating Action Buttons) */}
         {!isScenarioMode && (
           <div className="absolute bottom-8 right-8 z-30 flex flex-col items-end gap-4 pointer-events-none">
             {secondaryContent && (
